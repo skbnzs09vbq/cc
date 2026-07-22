@@ -1,0 +1,265 @@
+import { dedent } from '../_shared/utils.js'
+import { complete, generate, buildCommandPrompt, runCommand, readFile, writeFile, askUser, respond, exit, Schema } from '../_shared/complete.js'
+import { parseArgs } from '../_shared/args.js'
+import {
+  TARGET_REPO, BASE_BRANCH, PROJECT_ROOT,
+  ASSIGNEE, PR_TITLE_FORMAT, TYPES,
+  GUIDELINES, TASK_DIR,
+} from '../../local/project.js'
+
+const issueInput = parseArgs()
+
+// ─── Phase 1: 定数と guidelines.md を読む ─────────────────────
+phase('定数と guidelines.md を読む')
+
+const guidelinesContent = exists(GUIDELINES) ? readFile(GUIDELINES) || '' : ''
+
+// ─── Phase 2: Issue 詳細取得 ─────────────────────────────────
+phase('Issue 詳細取得')
+
+const ISSUE_SCHEMA: Schema = {
+  type: 'object',
+  properties: {
+    id: {
+      type: ['string', 'null'],
+      description: 'Issue の識別子（チケット番号等）。入力に含まれなければ null',
+    },
+    title:       { type: 'string' },
+    description: { type: 'string' },
+    tasks:       { type: 'array', items: { type: 'string' } },
+  },
+  required: ['id', 'title', 'description', 'tasks'],
+}
+
+const issue = complete(
+  issueInput.startsWith('http')
+    ? `"${issueInput}" 種別の読み取り専用ツールを ToolSearch で探して fetch し、Issue 情報として構造化してください。`
+    : `以下の入力を Issue 情報として解釈してください。\n\n入力: ${issueInput}`,
+  ISSUE_SCHEMA
+)
+
+const issueLabel = issue.id ? `${issue.title} (${issue.id})` : issue.title
+
+// ─── Phase 3: 調査 ────────────────────────────────────────────
+phase('調査')
+
+const PR_DUPLICATE_SCHEMA: Schema = {
+  type: 'object',
+  properties: {
+    duplicate: {
+      type: 'boolean',
+      description: `"${issueLabel}" と実装が重複しそうな open/draft PR があるかどうか`,
+    },
+    prs: {
+      type: ['array', 'null'],
+      description: 'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）。false の場合は null',
+      items: { type: 'string' },
+    },
+  },
+  required: ['duplicate', 'prs'],
+}
+
+const prCheck = complete(
+  buildCommandPrompt(
+    `"${issueLabel}" と実装が重複しそうな open/draft PR がないか確認してください。`,
+    [`gh pr list --repo ${TARGET_REPO} --state open --json number,title,headRefName,isDraft --limit 50`]
+  ),
+  PR_DUPLICATE_SCHEMA
+)
+
+if (prCheck.duplicate) {
+  const shouldContinue = askUser<boolean>(
+    dedent`
+      "${issueLabel}" と重複しそうな PR が見つかりました。
+      ${prCheck.prs.join('\n')}
+      このまま計画を続けますか？
+    `,
+    { type: 'boolean' }
+  )
+  if (!shouldContinue) {
+    exit('重複する PR がある可能性があるため、計画立案を中止しました。')
+  }
+}
+
+const relatedContext = Skill("research", `"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
+
+const codeResult = generate(
+  buildCommandPrompt(
+    dedent`
+      プロジェクト ${PROJECT_ROOT} で以下 issue に関連するコードを調査してください。origin/${BASE_BRANCH} の状態を基準にする。
+
+      Issue: ${issue.title}
+      説明: ${issue.description}
+      タスク: ${issue.tasks.join(' / ')}
+
+      調査内容:
+      1. 関連ファイル・ディレクトリの特定（パス列挙）
+      2. 現状の実装状況（何がある・何がない）
+      3. 変更が必要な箇所と影響範囲
+      4. 依存関係・注意点
+    `,
+    ['git fetch origin']
+  )
+)
+
+// ─── Phase 4: 計画立案 ───────────────────────────────────────
+phase('計画立案')
+
+const architecture = Agent({
+  subagent_type: 'Plan',
+  description: `${issueLabel} の実装計画設計`,
+  prompt: dedent`
+    以下の Issue と調査結果をもとに、実装計画を設計してください。
+
+    ## Issue
+    ID: ${issue.id || '(なし)'}
+    タイトル: ${issue.title}
+    説明: ${issue.description}
+    タスク:
+    ${issue.tasks.map((t: string) => '- ' + t).join('\n')}
+
+    ## PR 重複チェック
+    ${prCheck.duplicate ? prCheck.prs.join('\n') : '重複なし'}
+
+    ## 関連・重複しそうな既存タスク
+    ${relatedContext}
+
+    ## コードベース調査
+    ${codeResult}
+
+    ## 既存の実装指針（あれば踏まえる）
+    ${guidelinesContent || '（なし）'}
+  `,
+})
+
+const PLAN_SCHEMA: Schema = {
+  type: 'object',
+  properties: {
+    planContent: {
+      type: 'string',
+      description: '計画 Markdown の全文',
+    },
+  },
+  required: ['planContent'],
+}
+
+const planResult = complete(
+  dedent`
+    以下の設計内容を、指定のフォーマットに整形してください。
+
+    ## 設計内容
+    ${architecture}
+
+    ## 出力フォーマット
+
+    planContent に以下の Markdown テンプレートを埋めて返してください:
+
+    # ${issueLabel} 実装計画
+
+    ## 概要
+    {Issue の目的を 1〜2 文で要約}
+
+    ## 実装詳細
+    - \`path/to/file.ts\` — {何をするか}
+
+    ## 実装ステップ
+    1. {最初にやること}
+    2. ...
+
+    ## 懸念点・リスク
+    {あれば記載。なければ「なし」}
+
+    ## PR 概要
+    - タイトル: PR_TITLE_FORMAT「${PR_TITLE_FORMAT}」のプレースホルダをすべて埋めたタイトル（type: ${TYPES.join(' / ')}。チケット番号のプレースホルダがあり ID があれば ${issue.id} を使う）
+    - Assignee: ${ASSIGNEE}
+
+    ## 既存作業との重複
+    {PR・タスクとの重複があれば記載。なければ省略}
+  `,
+  PLAN_SCHEMA
+)
+
+const issueId = issue.id || generate(`"${issue.title}" から、ディレクトリ名に使える短い kebab-case のスラッグを生成してください。`)
+const result = { issueId, planContent: planResult.planContent }
+let planContent = result.planContent
+
+// ─── Phase 5: 複雑な実装の場合のみ grill-with-docs で精査する ─
+phase('複雑な実装の場合のみ grill-with-docs で精査する')
+
+const isComplex = complete(
+  dedent`
+    以下の実装計画が、次のいずれかに該当するか判定してください。該当しなければ false を返してください。
+
+    - 複数のドメイン・レイヤーにまたがる設計変更を伴う
+    - 新しいデータモデルやアーキテクチャパターンを導入する
+    - 既存の ADR や設計方針との整合性確認が必要と判断できる
+
+    実装計画:
+    ${planContent}
+  `,
+  { type: 'boolean' }
+)
+
+if (isComplex) {
+  const critique = Skill("grill-with-docs")
+  planContent = complete(dedent`
+    grill-with-docs の指摘を反映して実装計画を更新してください。
+
+    実装計画:
+    ${planContent}
+
+    指摘:
+    ${critique}
+  `)
+}
+
+// ─── Phase 6: 計画を作成して提示する ───────────────────────────
+phase('計画を作成して提示する')
+
+const planDir = `${TASK_DIR}${result.issueId}/`
+runCommand([`mkdir -p ${planDir}`])
+
+const APPROVAL_SCHEMA: Schema = {
+  type: 'object',
+  properties: {
+    approved: {
+      type: 'boolean',
+      description: 'この内容のまま進めてよいか',
+    },
+    feedback: {
+      type: ['string', 'null'],
+      description: 'approved が false の場合、修正してほしい内容。true の場合は null',
+    },
+  },
+  required: ['approved', 'feedback'],
+}
+
+let approved = false
+while (!approved) {
+  writeFile(`${planDir}plan.md`, planContent)
+
+  const response = askUser<{ approved: boolean, feedback: string | null }>(
+    dedent`
+      計画を作成しました（${planDir}plan.md）。この内容で進めてよいですか？
+
+      ${planContent}
+    `,
+    APPROVAL_SCHEMA
+  )
+
+  if (response.approved) {
+    approved = true
+  } else {
+    planContent = complete(dedent`
+      以下のフィードバックを反映して実装計画を更新してください。
+
+      実装計画:
+      ${planContent}
+
+      フィードバック:
+      ${response.feedback}
+    `)
+  }
+}
+
+respond({ issueId: result.issueId, planContent })
