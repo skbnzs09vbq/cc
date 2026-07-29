@@ -18,6 +18,9 @@ export const PROJECT_ROOT = '/path/to/project'
 /** タスク管理ツールの種類 */
 export const TASK_TRACKER: 'notion' | 'github' | 'linear' | 'backlog' | '' = 'github'
 
+/** auto-dev など自律実行系のスキルをこのプロジェクトで使うか */
+export const USE_AUTO_DEV = false
+
 /** テスト方針ドキュメントのパス（任意） */
 export const TEST_POLICY_URL = ''
 
@@ -47,6 +50,21 @@ export const MONOREPO_APPS_DIR = ''
 
 /** review-diff で Tailwind arbitrary value チェックを行うか */
 export const TAILWIND_CHECK = false
+
+/** auto-dev が同時実行を許可する workflow の最大数 */
+export const AUTO_DEV_MAX_CONCURRENT = 10
+
+/** auto-dev が起動先を選ぶ目標比率: auto-dev workflow */
+export const AUTO_DEV_RATIO_AUTO_DEV = 4
+
+/** auto-dev が起動先を選ぶ目標比率: pr-review workflow */
+export const AUTO_DEV_RATIO_PR_REVIEW = 4
+
+/** auto-dev が起動先を選ぶ目標比率: roadmap workflow */
+export const AUTO_DEV_RATIO_ROADMAP = 2
+
+/** auto-dev の issue 対応で、レビュー・E2E検証を最大何回繰り返すか */
+export const AUTO_DEV_ISSUE_MAX_ITERATIONS = 1
 
 /** 調査対象ソース一覧。type は読み取り専用 MCP ツールがある種別なら自由（slack・notion・github 等） */
 export const RESEARCH_SOURCES: { type: string, value: string, label?: string }[] = [

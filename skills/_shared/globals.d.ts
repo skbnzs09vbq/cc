@@ -15,5 +15,9 @@ declare function Workflow(options: any): any
 declare function CronCreate(options: any): any
 declare function CronList(): any
 
+// 指定した task_id のバックグラウンドタスクの現在の状態を、block: false で待たずに問い合わせる
+// （前回起動したタスクがまだ実行中かのポーリング・ヘルスチェック用）
+declare function TaskOutput(options: { task_id: string; block: boolean; timeout: number }): any
+
 // ファイル・ディレクトリの存在確認（実行者が Read/Glob ツールで確認する）
 declare function exists(path: string): boolean

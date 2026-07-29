@@ -1,15 +1,13 @@
 export const meta = {
   name: 'auto-dev-roadmap',
-  description: '仕様と実装状況を把握し、完成までのロードマップを更新して次のissueを作成する',
+  description: '仕様と実装状況を把握し、足りない部分を次のissueとして作成する',
   phases: [
     { title: '仕様・現状把握' },
-    { title: 'ロードマップ更新' },
+    { title: '次issue判定' },
     { title: 'issue作成' },
   ],
 }
 
-// .claude/skills/_shared/utils.ts の dedent をハードコードで複製したもの
-// （Workflow スクリプトはファイル import ができないため）
 function dedent(strings, ...values) {
   const bodyLines = strings.flatMap(s => s.split('\n').slice(1)).filter(l => l.trim())
   const indent = bodyLines.length ? Math.min(...bodyLines.map(l => l.match(/^ */)[0].length)) : 0
@@ -17,10 +15,9 @@ function dedent(strings, ...values) {
   return strings.reduce((acc, s, i) => acc + strip(s) + (i < values.length ? values[i] : ''), '').trim()
 }
 
-const ROADMAP_PATH = '.claude/local/roadmap.md'
-const NEXT_ISSUE_COUNT = 1 // 1回の実行で作成する issue 数の上限（トラッカーを一気に埋めないため）
+const NEXT_ISSUE_COUNT = 1
 
-const ROADMAP_SCHEMA = {
+const ITEMS_SCHEMA = {
   type: 'object',
   properties: {
     items: {
@@ -34,14 +31,10 @@ const ROADMAP_SCHEMA = {
         },
         required: ['title', 'description', 'rationale'],
       },
-      description: '次に着手すべき issue 候補一覧（優先度順）',
-    },
-    roadmapMarkdown: {
-      type: 'string',
-      description: '更新後のロードマップ全体の Markdown（完了・未着手・今回追加分が分かる形）',
+      description: '次に着手すべき issue 候補一覧（無ければ空配列）',
     },
   },
-  required: ['items', 'roadmapMarkdown'],
+  required: ['items'],
 }
 
 const DRAFT_SCHEMA = {
@@ -57,47 +50,104 @@ const DRAFT_SCHEMA = {
 // ─── Phase: 仕様・現状把握 ────────────────────────────────────
 phase('仕様・現状把握')
 
-const context = await agent(
+const specResearch = await agent(
   dedent`
-    以下を行い、調査結果をすべてまとめて返してください。
-
-    1. Skill("research", "プロジェクト全体の仕様・要件") を実行し、仕様に関する情報を取得する
-    2. .claude/local/project.ts の PROJECT_ROOT・GUIDELINES を確認し、プロジェクト全体の実装状況を調査する
-       （ディレクトリ構成・主要機能ごとの実装状況・未実装/TODO/既知の課題・コード品質や設計上の問題点を含む。
-       仕様に明記された機能に限らず、調査で見つかった問題点・技術的負債も対象にする）
-    3. ${ROADMAP_PATH}（無ければ新規作成）を読み込み、これまでのロードマップと既に着手・完了した項目を確認する
-    4. .claude/local/project.ts の TARGET_REPO を確認し、
-       gh issue list --repo <TARGET_REPO> --state open --json title,body で既存の open issue も確認する
-  `
-)
-
-// ─── Phase: ロードマップ更新 ──────────────────────────────────
-phase('ロードマップ更新')
-
-const roadmap = await agent(
-  dedent`
-    以下の調査結果をもとに、プロジェクト完成までのロードマップを更新し、次に着手すべき issue 候補を
-    優先度順に提案してください。既存の open issue・ロードマップ上ですでに issue 化済みの項目とは重複させないでください。
-
-    調査結果:
-    ${context}
+    Skill("research", "プロジェクト全体の仕様・要件") を実行し、仕様に関する情報を取得してください
+    取得した内容をそのまま返してください
   `,
-  { schema: ROADMAP_SCHEMA }
+  { phase: '仕様・現状把握', label: '仕様調査' }
 )
 
-log(`ロードマップ更新、次のissue候補 ${roadmap.items.length}件`)
+const existingIssues = await agent(
+  dedent`
+    .claude/local/project.ts の TARGET_REPO を確認し、
+    gh issue list --repo <TARGET_REPO> --state open --json title,body を実行し、結果をそのまま返してください
+  `,
+  { phase: '仕様・現状把握', label: '既存issue確認' }
+)
+
+// ─── Phase: 次issue判定 ────────────────────────────────────
+phase('次issue判定')
+
+let implementationStatus = null
+let items = (await agent(
+  dedent`
+    以下の仕様調査結果と既存 open issue を比較し、まだ issue 化されていない不足機能があれば
+    次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
+
+    仕様調査結果:
+    ${specResearch}
+
+    既存 open issue:
+    ${existingIssues}
+  `,
+  { schema: ITEMS_SCHEMA, phase: '次issue判定', label: '不足機能の判定' }
+)).items
+
+if (items.length === 0) {
+  implementationStatus = await agent(
+    dedent`
+      .claude/local/project.ts の PROJECT_ROOT・GUIDELINES を確認し、プロジェクト全体の実装状況を調査してください
+      （ディレクトリ構成・主要機能ごとの実装状況・未実装/TODO/既知の課題・コード品質や設計上の問題点を含む
+      仕様に明記された機能に限らず、調査で見つかった問題点・技術的負債も対象にする）
+      調査結果をそのまま返してください
+    `,
+    { phase: '次issue判定', label: '実装状況調査' }
+  )
+
+  items = (await agent(
+    dedent`
+      以下の仕様調査結果・実装状況をもとに、足りないと判断した部分があれば
+      次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
+      既存 open issue とは重複させないでください
+
+      仕様調査結果:
+      ${specResearch}
+
+      実装状況:
+      ${implementationStatus}
+
+      既存 open issue:
+      ${existingIssues}
+    `,
+    { schema: ITEMS_SCHEMA, phase: '次issue判定', label: '実装不足の判定' }
+  )).items
+}
+
+if (items.length === 0) {
+  const existingPrs = await agent(
+    dedent`
+      .claude/local/project.ts の TARGET_REPO を確認し、
+      gh pr list --repo <TARGET_REPO> --state open --json number,title,mergeable,url を実行し、結果をそのまま返してください
+    `,
+    { phase: '次issue判定', label: '既存PR確認' }
+  )
+
+  items = (await agent(
+    dedent`
+      以下の open PR 一覧を確認し、問題点（コンフリクト等）があれば、それを解消するための
+      issue 候補として提案してください（無ければ items を空配列にしてください）
+
+      open PR 一覧:
+      ${existingPrs}
+    `,
+    { schema: ITEMS_SCHEMA, phase: '次issue判定', label: 'PRの問題点判定' }
+  )).items
+}
+
+log(`次のissue候補 ${items.length}件`)
 
 // ─── Phase: issue作成 ────────────────────────────────────────
 phase('issue作成')
 
-const toCreate = roadmap.items.slice(0, NEXT_ISSUE_COUNT)
+const toCreate = items.slice(0, NEXT_ISSUE_COUNT)
 
 const created = await pipeline(
   toCreate,
 
   item => agent(
     dedent`
-      引数（issueにしたい内容）:
+      issueにしたい内容:
       タイトル案: ${item.title}
       内容: ${item.description}
       理由: ${item.rationale}
@@ -110,10 +160,11 @@ const created = await pipeline(
 
     const url = await agent(
       dedent`
-        以下の issue 下書きから、.claude/local/project.ts の TARGET_REPO に対して gh issue create を実行し、
-        実際に issue を作成してください（1行目をタイトル、残りを本文として扱う）。
-        本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出す等、安全な方法で実行してください。
-        作成した issue の URL を返してください。
+        以下の issue 下書きから、.claude/local/project.ts の TARGET_REPO・ASSIGNEE を確認してから gh issue create を実行し、
+        実際に issue を作成してください（1行目をタイトル、残りを本文として扱う）
+        --add-assignee <ASSIGNEE> フラグで ASSIGNEE を指定して、作成と同時にアサインしてください
+        本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出す等、安全な方法で実行してください
+        作成した issue の URL を返してください
 
         下書き:
         ${draftResult.draft}
@@ -122,15 +173,6 @@ const created = await pipeline(
     )
     return `${item.title}: 作成（${url}）`
   }
-)
-
-await agent(
-  dedent`
-    ${ROADMAP_PATH} に、以下のロードマップ全文を書き込んでください（既存内容は上書きしてよい）。
-
-    ${roadmap.roadmapMarkdown}
-  `,
-  { phase: 'issue作成' }
 )
 
 log(`issue ${created.filter(Boolean).length}件を処理`)

@@ -5,6 +5,9 @@ import { getArgs } from '../_shared/args.js'
 const TEMPLATE_PATH = '.claude/project.example.ts'
 const OUTPUT_PATH = '.claude/local/project.ts'
 
+const AUTO_DEV_TEMPLATE_PATH = '.claude/rules.auto-dev.example.md'
+const RULES_PATH = '.claude/local/rules.md'
+
 const ARGS_SCHEMA: Schema = {
   type: 'object',
   properties: {
@@ -24,11 +27,13 @@ const ARGS_SCHEMA: Schema = {
 
 const { mode, names } = getArgs<{ mode: 'add' | 'update', names: string[] }>(ARGS_SCHEMA)
 
+const output = readFile(OUTPUT_PATH)
+const isInitialSetup = !output
+
 // ─── Phase 1: 定数の値を確認 ─────────────────────────────────
 phase('定数の値を確認')
 
 const template = readFile(TEMPLATE_PATH)
-const output = readFile(OUTPUT_PATH)
 
 const VALUES_SCHEMA: Schema = {
   type: 'object',
@@ -56,36 +61,60 @@ const finalValues = askUser<Record<string, string>>(
   VALUES_SCHEMA
 )
 
-if (Object.keys(finalValues).length === 0) {
-  exit('対象の定数は設定済みです。')
+if (Object.keys(finalValues).length === 0 && !isInitialSetup) {
+  exit('対象の定数は設定済みです')
 }
 
 // ─── Phase 2: OUTPUT の作成・更新 ────────────────────────────
 phase('OUTPUT の作成・更新')
 
-const newContent = generate(
-  output
-    ? dedent`
-        以下の既存内容のうち、次の値に該当する定数の宣言だけを更新してください（他の宣言はそのまま保持する）。
+const newContent = Object.keys(finalValues).length === 0
+  ? output!
+  : generate(
+      output
+        ? dedent`
+            以下の既存内容のうち、次の値に該当する定数の宣言だけを更新してください（他の宣言はそのまま保持する）。
 
-        既存内容:
-        ${output}
+            既存内容:
+            ${output}
 
-        更新する値:
-        ${JSON.stringify(finalValues)}
-      `
-    : dedent`
-        以下のテンプレートと同じ構造（export const 宣言・JSDoc コメント・区切りコメント）で、
-        次の値に該当する定数だけ値を置き換えて新規作成してください（それ以外はテンプレートの既定値のまま残す）。
+            更新する値:
+            ${JSON.stringify(finalValues)}
+          `
+        : dedent`
+            以下のテンプレートと同じ構造（export const 宣言・JSDoc コメント・区切りコメント）で、
+            次の値に該当する定数だけ値を置き換えて新規作成してください（それ以外はテンプレートの既定値のまま残す）。
 
-        テンプレート:
-        ${template}
+            テンプレート:
+            ${template}
 
-        更新する値:
-        ${JSON.stringify(finalValues)}
-      `
-)
+            更新する値:
+            ${JSON.stringify(finalValues)}
+          `
+    )
 
 writeFile(OUTPUT_PATH, newContent)
 
-respond(`${OUTPUT_PATH} を更新しました（対象: ${Object.keys(finalValues).join(', ')}）`)
+respond(`${OUTPUT_PATH} を更新しました（対象: ${Object.keys(finalValues).join(', ') || 'なし'}）`)
+
+// ─── Phase 3: auto-dev の有効化 ─────────────────────────────
+phase('auto-dev の有効化')
+
+if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
+  const rulesContent = readFile(RULES_PATH)
+  const autoDevTemplate = readFile(AUTO_DEV_TEMPLATE_PATH)
+  const merged = rulesContent
+    ? generate(dedent`
+        以下の既存内容に、次のテンプレート内容を追記してください。
+        既存内容に同じ見出し（例: "## GitHub 操作"）が既にあれば、新規見出しを作らずそのセクション内に自然に統合する。
+
+        既存内容:
+        ${rulesContent}
+
+        追記するテンプレート:
+        ${autoDevTemplate}
+      `)
+    : autoDevTemplate!
+  writeFile(RULES_PATH, merged)
+  respond(`${RULES_PATH} に auto-dev 用ルールを追加しました`)
+}

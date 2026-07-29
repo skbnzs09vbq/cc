@@ -1,6 +1,6 @@
 import { dedent } from '../_shared/utils.js'
 import { complete, generate, runCommand, remember, askUser, respond, Schema } from '../_shared/complete.js'
-import { parseArgs } from '../_shared/args.js'
+import { getArgs } from '../_shared/args.js'
 import { TARGET_REPO } from '../../local/project.js'
 
 remember(['git commit・git push・PR 作成は絶対に行わないこと'])
@@ -8,7 +8,17 @@ remember(['git commit・git push・PR 作成は絶対に行わないこと'])
 // ─── Phase 1: 指摘収集 ─────────────────────────────────────
 phase('指摘収集')
 
-const input = parseArgs() || askUser('対象の GitHub PR URL を教えてください。')
+const ARGS_SCHEMA: Schema = {
+  type: 'object',
+  properties: {
+    url: { type: ['string', 'null'], description: '対象の GitHub PR URL。無ければ null' },
+    autonomous: { type: 'boolean', description: 'workflow 等からの無人実行なら true。ユーザーが直接呼んだ場合は false' },
+  },
+  required: ['url', 'autonomous'],
+}
+
+const { url, autonomous } = getArgs<{ url: string | null, autonomous: boolean }>(ARGS_SCHEMA)
+const input = url || askUser('対象の GitHub PR URL を教えてください。')
 
 const prNumber = generate(`"${input}" から PR 番号を抽出してください。`)
 
@@ -68,7 +78,7 @@ respond(dedent`
 // ─── Phase 3: 対応方針の確認 ─────────────────────────────────
 phase('対応方針の確認')
 
-const mode = askUser<number>(
+const mode = autonomous ? 2 : askUser<number>(
   dedent`
     上記の指摘にどう対応しますか？
 
@@ -82,7 +92,7 @@ const mode = askUser<number>(
 phase('実装への委譲')
 
 if (mode === 2) {
-  const excludeNumbers = askUser<number[]>(
+  const excludeNumbers = autonomous ? [] : askUser<number[]>(
     '対応しない項目の番号を教えてください（無ければ空配列で回答してください）。',
     { type: 'array', items: { type: 'number' }, description: '除外する項目の番号一覧' }
   )

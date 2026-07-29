@@ -1,18 +1,27 @@
 # Rules
 
+`.claude/local/rules.md` があれば、その内容をこのファイルより優先する
+
 ## project 固有情報の扱い（最優先の禁止事項）
 
-project 固有の情報（project.ts の実値、guidelines.md、pr-review-patterns.md、tasks/ 配下の作業ファイル、
-commands.md 等）は必ず `.claude/local/` 配下に閉じ込め、`skill.ts`・`project.example.ts`・`CLAUDE.md`・
-`agents/` 等、git 管理される場所には書き込まないこと。`.claude/local/` はテンプレート（`project.example.ts` 等）
-の実値化・生成物置き場であり、`.gitignore` でフォルダ構造だけ追跡され中身は追跡されない。
+- project 固有の情報（project.ts の実値、guidelines.md、pr-review-patterns.md、tasks/ 配下の作業ファイル、commands.md 等）は必ず `.claude/local/` 配下に置く
+- `skill.ts`・`project.example.ts`・`CLAUDE.md`・`agents/` 等には書き込まない
+- `.claude/local/` は、テンプレート（`project.example.ts` 等）を実値化したものや生成物を置く場所
+- `.claude/local/` は `.gitignore` でフォルダ構造だけ追跡され、中身（ファイル）は追跡されない
+
+CLAUDE.md 内に、具体的なファイル名・ツール名・値などプロジェクト固有の詳細を書き足したくなった場合
+
+- **CLAUDE.md 自体は編集禁止**。書き足す先は必ず `.claude/local/rules.md`（無ければ新規作成）
+- ファイルは増やさない。`.claude/local/rules.md` の1本に固定し、常にここへ追記する
+- `.claude/local/rules.md` 内では、CLAUDE.md側の該当セクションと同じ見出し（例: `## GitHub 操作`）を使って追記する
+- CLAUDE.md 側には汎用的でそれ単体でも機能するルール本文を残す。`.claude/local/rules.md` 側は、それに上乗せする具体化・詳細だけを書く
 
 ## GitHub 操作
 
-- `git commit`, `git push` および PR 作成は、ユーザーの明示的な許可を得てから実行すること（`git switch` は各スキルの判断に委ねる。`auto-dev` workflow は自律実行が前提のため例外で、これらを自動で行ってよい）
-- ユーザーの許可なく PR に加筆・編集・コメントを行わないこと（`auto-dev` workflow は例外）
+- `git commit`, `git push` および PR 作成は、ユーザーの明示的な許可を得てから実行すること
+- ユーザーの許可なく PR に加筆・編集・コメントを行わないこと
 - 担当者（`ASSIGNEE`）以外のアカウントが担当する PR に対して、read 以外の操作（編集・コメント・マージ等）を行わないこと。`ASSIGNEE` の値は `.claude/local/project.ts` を参照する
-- PR のマージは絶対に行わないこと（担当者・権限問わず。`auto-dev` の PRレビュー workflow が指摘なしと判断した場合のみ例外で自動マージしてよい）
+- PR のマージは絶対に行わないこと（担当者・権限問わず）
 
 ## Slack
 
