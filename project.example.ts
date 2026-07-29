@@ -60,8 +60,8 @@ export const AUTO_DEV_RATIO_AUTO_DEV = 4
 /** auto-dev が起動先を選ぶ目標比率: pr-review workflow */
 export const AUTO_DEV_RATIO_PR_REVIEW = 4
 
-/** auto-dev が起動先を選ぶ目標比率: roadmap workflow */
-export const AUTO_DEV_RATIO_ROADMAP = 2
+/** auto-dev が起動先を選ぶ目標比率: direction workflow */
+export const AUTO_DEV_RATIO_DIRECTION = 2
 
 /** auto-dev の issue 対応で、レビュー・E2E検証を最大何回繰り返すか */
 export const AUTO_DEV_ISSUE_MAX_ITERATIONS = 1

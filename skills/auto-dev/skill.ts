@@ -3,8 +3,8 @@ import {
   AUTO_DEV_ISSUE_MAX_ITERATIONS,
   AUTO_DEV_MAX_CONCURRENT,
   AUTO_DEV_RATIO_AUTO_DEV,
+  AUTO_DEV_RATIO_DIRECTION,
   AUTO_DEV_RATIO_PR_REVIEW,
-  AUTO_DEV_RATIO_ROADMAP,
   TARGET_REPO,
   USE_AUTO_DEV,
 } from '../../local/project.js'
@@ -47,13 +47,13 @@ if (!alreadyScheduled) {
 
 const STATE_PATH = '.claude/local/running-workflows.json'
 
-type WorkflowType = 'auto-dev' | 'pr-review' | 'roadmap'
-type DirectWorkflowType = 'pr-review' | 'roadmap'
+type WorkflowType = 'auto-dev' | 'pr-review' | 'direction'
+type DirectWorkflowType = 'pr-review' | 'direction'
 
 const TARGET_RATIO: Record<WorkflowType, number> = {
   'auto-dev': AUTO_DEV_RATIO_AUTO_DEV,
   'pr-review': AUTO_DEV_RATIO_PR_REVIEW,
-  roadmap: AUTO_DEV_RATIO_ROADMAP,
+  direction: AUTO_DEV_RATIO_DIRECTION,
 }
 
 type ScriptKind = 'issue' | 'pr-comment' | DirectWorkflowType
@@ -62,7 +62,7 @@ const SCRIPT_PATHS: Record<ScriptKind, string> = {
   issue: '.claude/skills/auto-dev/issue-workflow.js',
   'pr-comment': '.claude/skills/auto-dev/pr-comment-workflow.js',
   'pr-review': '.claude/skills/auto-dev/pr-review-workflow.js',
-  roadmap: '.claude/skills/auto-dev/roadmap-workflow.js',
+  direction: '.claude/skills/auto-dev/direction-workflow.js',
 }
 
 type RunningEntry = {
@@ -105,12 +105,32 @@ if (stillRunning.length >= AUTO_DEV_MAX_CONCURRENT) {
   exit()
 }
 
-const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, roadmap: 0 }
+const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, direction: 0 }
 for (const entry of stillRunning) counts[entry.type]++
 
-const nextType = (Object.keys(TARGET_RATIO) as WorkflowType[])
-  .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
-  .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
+const openIssueCount =
+  Number(
+    runCommand([
+      `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number --jq length`,
+    ]),
+  ) || 0
+
+if (openIssueCount === 0 && counts['direction'] > 0) {
+  respond(dedent`
+    open issue 0件・direction 実行中のため、今回は新規起動しません
+
+    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
+    ${formatRunning(stillRunning)}
+  `)
+  exit()
+}
+
+const nextType: WorkflowType =
+  openIssueCount === 0
+    ? 'direction'
+    : (Object.keys(TARGET_RATIO) as WorkflowType[])
+        .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
+        .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
 
 // ─── Phase 3: workflow 起動 ────────────────────────────────────
 phase('workflow 起動')
@@ -258,12 +278,12 @@ switch (nextType) {
   case 'pr-review':
     target = resolvePrReviewTarget()
     break
-  case 'roadmap':
+  case 'direction':
     target = {
-      scriptPath: SCRIPT_PATHS['roadmap'],
+      scriptPath: SCRIPT_PATHS['direction'],
       args: undefined,
       kind: null,
-      target: 'roadmap 生成',
+      target: 'direction 生成',
       worktreePath: null,
     }
     break
@@ -273,7 +293,7 @@ if (!target) {
   respond(dedent`
     対応対象の issue・PR がないため、今回は新規起動しません
 
-    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} roadmap:${counts['roadmap']}）
+    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
     ${formatRunning(stillRunning)}
   `)
   exit()
@@ -296,6 +316,6 @@ counts[nextType]++
 respond(dedent`
   ${nextType} を起動: ${target.target}
 
-  実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} roadmap:${counts['roadmap']}）
+  実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
   ${formatRunning(stillRunning)}
 `)

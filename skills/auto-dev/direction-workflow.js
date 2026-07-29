@@ -1,6 +1,6 @@
 export const meta = {
-  name: 'auto-dev-roadmap',
-  description: '仕様と実装状況を把握し、足りない部分を次のissueとして作成する',
+  name: 'auto-dev-direction',
+  description: '仕様と実装状況を把握し、1つの観点に絞って足りない部分をissueとして作成する（粒度を細かく分け、複数作成する）',
   phases: [
     { title: '仕様・現状把握' },
     { title: '次issue判定' },
@@ -15,7 +15,14 @@ function dedent(strings, ...values) {
   return strings.reduce((acc, s, i) => acc + strip(s) + (i < values.length ? values[i] : ''), '').trim()
 }
 
-const NEXT_ISSUE_COUNT = 1
+const MAX_ISSUE_COUNT = 15
+
+const GRANULARITY_NOTE = dedent`
+  - 対象は不足している観点（例: 特定の機能領域・レイヤー・仕様の一部分など）を1つだけ選び、その観点の範囲内でのみ探してください（他の観点は次回以降に回してよい。今回見つけた範囲をすべてissue化しようとしないこと）
+  - 選んだ観点の中で見つかった課題は、できるだけ粒度を細かく分割し、複数のissue候補として提案してください
+  - ただし同時に実装しないと技術的に問題がある（強い依存関係がある等）場合のみ、1つのissueにまとめてください
+  - 提案するissue候補は多くても${MAX_ISSUE_COUNT}件程度にしてください
+`
 
 const ITEMS_SCHEMA = {
   type: 'object',
@@ -47,7 +54,7 @@ const DRAFT_SCHEMA = {
   required: ['aborted', 'reason', 'draft'],
 }
 
-// ─── Phase: 仕様・現状把握 ────────────────────────────────────
+// ─── Phase 1: 仕様・現状把握 ──────────────────────────────────
 phase('仕様・現状把握')
 
 const specResearch = await agent(
@@ -66,7 +73,7 @@ const existingIssues = await agent(
   { phase: '仕様・現状把握', label: '既存issue確認' }
 )
 
-// ─── Phase: 次issue判定 ────────────────────────────────────
+// ─── Phase 2: 次issue判定 ─────────────────────────────────────
 phase('次issue判定')
 
 let implementationStatus = null
@@ -74,6 +81,8 @@ let items = (await agent(
   dedent`
     以下の仕様調査結果と既存 open issue を比較し、まだ issue 化されていない不足機能があれば
     次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
+
+    ${GRANULARITY_NOTE}
 
     仕様調査結果:
     ${specResearch}
@@ -101,6 +110,8 @@ if (items.length === 0) {
       次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
       既存 open issue とは重複させないでください
 
+      ${GRANULARITY_NOTE}
+
       仕様調査結果:
       ${specResearch}
 
@@ -127,6 +138,7 @@ if (items.length === 0) {
     dedent`
       以下の open PR 一覧を確認し、問題点（コンフリクト等）があれば、それを解消するための
       issue 候補として提案してください（無ければ items を空配列にしてください）
+      提案するissue候補は多くても${MAX_ISSUE_COUNT}件程度にしてください
 
       open PR 一覧:
       ${existingPrs}
@@ -137,10 +149,10 @@ if (items.length === 0) {
 
 log(`次のissue候補 ${items.length}件`)
 
-// ─── Phase: issue作成 ────────────────────────────────────────
+// ─── Phase 3: issue作成 ───────────────────────────────────────
 phase('issue作成')
 
-const toCreate = items.slice(0, NEXT_ISSUE_COUNT)
+const toCreate = items.slice(0, MAX_ISSUE_COUNT)
 
 const created = await pipeline(
   toCreate,

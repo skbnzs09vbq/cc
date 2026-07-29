@@ -38,12 +38,12 @@ const COMMIT_SCHEMA = {
   required: ['message', 'body'],
 }
 
-const { pr, worktreePath } = args
+const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
 log(`PR #${pr.number} のコメント対応を開始`)
 
-// ─── Phase: PR対応 ────────────────────────────────────────
+// ─── Phase 1: PR対応 ─────────────────────────────────────────
 phase('PR対応')
 
 const summary = await agent(

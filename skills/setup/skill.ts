@@ -6,6 +6,7 @@ import {
   generate,
   readFile,
   respond,
+  runCommand,
   writeFile,
 } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
@@ -61,6 +62,10 @@ const finalValues = askUser<Record<string, string>>(
     - 現在値があれば「現在値 → 変更するか」を確認する
     - テンプレートに既定値があればそれを提示し、変更したい場合のみ新しい値を聞く
     - いずれもなければ値を質問する（不明・未使用なら空欄でよい旨を伝える）
+    - 確認・質問は長文の一括箇条書きではなく、選択式 UI（1問につき2〜4択、1回につき最大4問）のダイアログで行う。
+      enum・boolean・既知候補（現在値／自動検出値／テンプレート既定値／変更する 等）がある定数は選択肢として提示する。
+      URL・パスなど自由記述が必要な定数のみ、選択肢の中に「自由入力」を含めるか個別にテキストで質問する
+    - 対象定数が5件を超える場合は、関連する定数ごとにまとめて複数回に分けて聞く（1回に詰め込みすぎない）
 
     テンプレート:
     ${template}
@@ -128,4 +133,51 @@ if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
     : autoDevTemplate!
   writeFile(RULES_PATH, merged)
   respond(`${RULES_PATH} に auto-dev 用ルールを追加しました`)
+}
+
+// ─── Phase 4: 初回コミット確認 ───────────────────────────────
+phase('初回コミット確認')
+
+if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
+  const baseBranch = newContent.match(/BASE_BRANCH\s*=\s*['"]([^'"]+)['"]/)?.[1] || 'main'
+  const hasCommits = runCommand(['git rev-parse --verify HEAD'])
+
+  if (!hasCommits) {
+    const { confirmed } = askUser<{ confirmed: boolean }>(
+      'このリポジトリにはまだコミットが1つもありません。auto-dev の worktree 作成には最低1つのコミットが必要です。空の初回コミット（chore: initial empty commit）を作成してよいですか？',
+      {
+        type: 'object',
+        properties: { confirmed: { type: 'boolean' } },
+        required: ['confirmed'],
+      },
+    )
+
+    if (confirmed) {
+      runCommand(['git commit --allow-empty -m "chore: initial empty commit"'])
+      respond('空の初回コミットを作成しました')
+
+      const { confirmedPush } = askUser<{ confirmedPush: boolean }>(
+        `この初回コミットを origin/${baseBranch}（project.ts の BASE_BRANCH）に push してよいですか？（worktree 作成には push 済みの状態が必要です）`,
+        {
+          type: 'object',
+          properties: { confirmedPush: { type: 'boolean' } },
+          required: ['confirmedPush'],
+        },
+      )
+
+      if (confirmedPush) {
+        runCommand([`git push -u origin HEAD:${baseBranch}`])
+        respond('push しました')
+      } else {
+        respond('push は行いませんでした。push するまで auto-dev の worktree 作成は失敗します')
+      }
+    }
+  }
+}
+
+// ─── Phase 5: 案内 ─────────────────────────────────────────
+phase('案内')
+
+if (/USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
+  respond('`/auto-dev` を実行して workflow を起動することができます')
 }

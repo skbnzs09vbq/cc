@@ -70,7 +70,7 @@ Workflow は、複数のサブエージェントをオーケストレーショ�
 
 issue の作成から実装・レビュー・マージまで、役割ごとに分かれた workflow が AI だけで自走する
 
-- チケット作成者: `roadmap-workflow.js`
+- チケット作成者: `direction-workflow.js`
     仕様と実装状況から次の issue を作成
 - 実装者: `issue-workflow.js`
     issue を計画 -> 実装 -> レビュー -> PR作成まで対応
@@ -90,7 +90,7 @@ skill.ts（状態管理・workflow の管理を行う）
 - workflow 起動
     - auto-dev → issue か PR コメント対応を1件選び、worktree を用意して起動
     - pr-review → 自分の open PR を1件選び、worktree を用意して起動
-    - roadmap → そのまま起動
+    - direction → そのまま起動
 
 issue-workflow.js（skill.ts が選んだ issue 1件を処理する）
 ├── 計画立案
@@ -133,7 +133,7 @@ pr-review-workflow.js（skill.ts が選んだ open PR 1件をレビューする�
     ├── マージできたら worktree を削除
     └── それでも解消できなければ PR にその旨を返信
 
-roadmap-workflow.js（毎回1件、次の issue を作成する）
+direction-workflow.js（毎回1件、次の issue を作成する）
 ├── 仕様・現状把握
 │   ├── `research` で仕様に関する情報を取得
 │   └── 既存の open issue を確認

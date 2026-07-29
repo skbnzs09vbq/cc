@@ -80,12 +80,12 @@ const PR_DRAFT_SCHEMA = {
   required: ['title', 'description'],
 }
 
-const { issue, worktreePath, maxIterations } = args
+const { issue, worktreePath, maxIterations } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
 log(`issue #${issue.number} の対応を開始`)
 
-// ─── Phase: 計画立案 ────────────────────────────────────────
+// ─── Phase 1: 計画立案 ───────────────────────────────────────
 phase('計画立案')
 
 const plan = await agent(
@@ -103,7 +103,7 @@ if (plan.aborted) {
   return { result }
 }
 
-// ─── Phase: ブランチ作成 ────────────────────────────────────
+// ─── Phase 2: ブランチ作成 ───────────────────────────────────
 phase('ブランチ作成')
 
 const branch = await agent(
@@ -127,7 +127,7 @@ await agent(
   { phase: 'ブランチ作成', label: `issue #${issue.number}` }
 )
 
-// ─── Phase: 実装 ────────────────────────────────────────
+// ─── Phase 3: 実装 ───────────────────────────────────────────
 phase('実装')
 
 await agent(
@@ -140,7 +140,7 @@ await agent(
   { agentType: 'implement', phase: '実装', label: `issue #${issue.number}` }
 )
 
-// ─── Phase: レビュー・E2E検証 ────────────────────────────
+// ─── Phase 4: レビュー・E2E検証 ─────────────────────────────
 phase('レビュー・E2E検証')
 
 let clean = false
@@ -197,7 +197,7 @@ if (!clean && iterations >= maxIterations) {
   return { result }
 }
 
-// ─── Phase: コミット・PR作成 ────────────────────────────
+// ─── Phase 5: コミット・PR作成 ─────────────────────────────
 phase('コミット・PR作成')
 
 const commit = await agent(

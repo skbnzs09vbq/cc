@@ -42,7 +42,7 @@ const CHECK_SCHEMA = {
   required: ['clean', 'findings'],
 }
 
-const { pr, worktreePath } = args
+const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
 async function mergeAndVerify(pr) {
@@ -109,7 +109,7 @@ async function mergeAndVerify(pr) {
 
 log(`PR #${pr.number} のレビュー・対応を開始`)
 
-// ─── Phase: 状態確認 ────────────────────────────────────────
+// ─── Phase 1: 状態確認 ───────────────────────────────────────
 phase('状態確認')
 
 const reviewStatus = await agent(
@@ -149,7 +149,7 @@ let result
 if (!resolved) {
   result = `pr #${pr.number}: 未解決の指摘あり`
 } else if (!reviewStatus.hasComments) {
-  // ─── Phase: コードレビュー ──────────────────────────────
+  // ─── Phase 2: コードレビュー ────────────────────────────────
   phase('コードレビュー')
 
   const codeReview = await agent(
@@ -162,6 +162,7 @@ if (!resolved) {
   )
 
   if (codeReview.clean) {
+    // ─── Phase 3: マージ ──────────────────────────────────────
     phase('マージ')
     const { merged, note } = await mergeAndVerify(pr)
     result = merged ? `pr #${pr.number}: 指摘なし、マージ完了` : `pr #${pr.number}: 指摘なしだが未マージ（${note}）`
@@ -178,6 +179,7 @@ if (!resolved) {
     result = `pr #${pr.number}: code-review で指摘あり`
   }
 } else {
+  // ─── Phase 3: マージ ──────────────────────────────────────
   phase('マージ')
   const { merged, note } = await mergeAndVerify(pr)
   result = merged ? `pr #${pr.number}: 指摘すべて解消済み、マージ完了` : `pr #${pr.number}: 指摘は解消済みだが未マージ（${note}）`

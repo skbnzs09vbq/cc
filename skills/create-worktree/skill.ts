@@ -1,4 +1,4 @@
-import { BASE_BRANCH } from '../../local/project.js'
+import { BASE_BRANCH, TICKET_PREFIX } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, respond, runCommand } from '../_shared/complete.js'
 
@@ -18,7 +18,7 @@ const ARGS_SCHEMA: Schema = {
 
 const { issueNumber, branch } = getArgs<{ issueNumber: number; branch: string | null }>(ARGS_SCHEMA)
 
-const worktreePath = `${WORKTREE_DIR}/issue-${issueNumber}`
+const worktreePath = `${WORKTREE_DIR}/${TICKET_PREFIX || 'issue'}-${issueNumber}`
 
 const list = runCommand(['git worktree list --porcelain']) || ''
 const exists = list.includes(worktreePath)
