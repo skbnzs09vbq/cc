@@ -1,6 +1,6 @@
+import { GUIDELINES, GUIDELINES_CATEGORY_EXAMPLES } from '../../local/project.js'
+import { type Schema, complete, exit, readFile, respond, writeFile } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
-import { complete, respond, exit, readFile, writeFile, Schema } from '../_shared/complete.js'
-import { GUIDELINES_CATEGORY_EXAMPLES, GUIDELINES } from '../../local/project.js'
 
 const OUTPUT_FORMAT = dedent`
   # 実装指針
@@ -71,7 +71,7 @@ const { candidates } = complete(
 
     該当するパターンが1つも見つからない場合は candidates を null にしてください。
   `,
-  CANDIDATE_SCHEMA
+  CANDIDATE_SCHEMA,
 )
 
 // ─── Phase 2: 既存指針の読み込み ────────────────────────────
@@ -100,7 +100,7 @@ const MERGE_SCHEMA: Schema = {
         type: 'object',
         properties: {
           action: { type: 'string', enum: ['追加', '更新', '統合', '削除'] },
-          title:  { type: 'string' },
+          title: { type: 'string' },
         },
         required: ['action', 'title'],
       },
@@ -117,7 +117,7 @@ const merged = complete(
     ${existingGuidelines || '（ファイルなし。新規作成する）'}
 
     ## 新しい指針候補
-    ${candidates ? candidates.map((c: { category: string, title: string, rule: string }) => `- [${c.category}] ${c.title}: ${c.rule}`).join('\n') : '（なし）'}
+    ${candidates ? candidates.map((c: { category: string; title: string; rule: string }) => `- [${c.category}] ${c.title}: ${c.rule}`).join('\n') : '（なし）'}
 
     ## マージ方針
     - 既存内容と新しい指針候補をマージする
@@ -132,11 +132,13 @@ const merged = complete(
     fileContent には、この出力フォーマットに従った Markdown 全文を返してください。
     changes には、今回の更新で実際に追加・更新・統合・削除した指針を列挙してください（変更がなければ null）。
   `,
-  MERGE_SCHEMA
+  MERGE_SCHEMA,
 )
 
 if (!merged.changes) {
-  exit('guidelines.md に変更はありませんでした（新規に記録すべき指針、または更新すべき既存指針は見つかりませんでした）。')
+  exit(
+    'guidelines.md に変更はありませんでした（新規に記録すべき指針、または更新すべき既存指針は見つかりませんでした）。',
+  )
 }
 
 writeFile(GUIDELINES, merged.fileContent)
@@ -145,7 +147,7 @@ writeFile(GUIDELINES, merged.fileContent)
 phase('報告')
 
 const report = merged.changes
-  .map((c: { action: string, title: string }) => `- [${c.action}] ${c.title}`)
+  .map((c: { action: string; title: string }) => `- [${c.action}] ${c.title}`)
   .join('\n')
 
 respond(dedent`

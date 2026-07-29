@@ -1,6 +1,12 @@
+import {
+  COMMIT_ALLOW_BODY,
+  COMMIT_FORMAT,
+  COMMIT_LANG,
+  TICKET_PREFIX,
+  TYPES,
+} from '../../local/project.js'
+import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
-import { complete, runCommand, remember, respond, Schema } from '../_shared/complete.js'
-import { TICKET_PREFIX, COMMIT_FORMAT, COMMIT_LANG, COMMIT_ALLOW_BODY, TYPES } from '../../local/project.js'
 
 remember(['git commit は実行しないこと'])
 
@@ -29,8 +35,9 @@ const CANDIDATE_SCHEMA: Schema = {
   required: ['message'],
 }
 
-const candidates = ANGLES.map(angle => complete(
-  dedent`
+const candidates = ANGLES.map((angle) =>
+  complete(
+    dedent`
     以下の差分から、"${angle}" の切り口でコミットメッセージ候補を1つ生成してください。
 
     コミットメッセージの形式: "${COMMIT_FORMAT}"
@@ -43,14 +50,17 @@ const candidates = ANGLES.map(angle => complete(
 
     説明文は ${COMMIT_LANG} で簡潔に。body は${COMMIT_ALLOW_BODY ? '含めてよい' : '含めない'}。
   `,
-  CANDIDATE_SCHEMA
-))
+    CANDIDATE_SCHEMA,
+  ),
+)
 
 // ─── Phase 3: 出力の整形 ─────────────────────────────────
 phase('出力の整形')
 
-const output = candidates.map((c: { message: string, body: string | null }, i: number) =>
-  c.body ? `${i + 1}. ${c.message}\n\n   ${c.body}` : `${i + 1}. ${c.message}`
-).join('\n')
+const output = candidates
+  .map((c: { message: string; body: string | null }, i: number) =>
+    c.body ? `${i + 1}. ${c.message}\n\n   ${c.body}` : `${i + 1}. ${c.message}`,
+  )
+  .join('\n')
 
 respond(output)

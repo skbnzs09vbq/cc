@@ -1,6 +1,14 @@
-import { dedent } from '../_shared/utils.js'
-import { generate, askUser, readFile, writeFile, respond, exit, Schema } from '../_shared/complete.js'
 import { getArgs } from '../_shared/args.js'
+import {
+  type Schema,
+  askUser,
+  exit,
+  generate,
+  readFile,
+  respond,
+  writeFile,
+} from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 const TEMPLATE_PATH = '.claude/project.example.ts'
 const OUTPUT_PATH = '.claude/local/project.ts'
@@ -19,13 +27,14 @@ const ARGS_SCHEMA: Schema = {
     names: {
       type: 'array',
       items: { type: 'string' },
-      description: '対象の定数名一覧。update の場合は先頭の "update" を除いた残りのトークン、add の場合は全トークン',
+      description:
+        '対象の定数名一覧。update の場合は先頭の "update" を除いた残りのトークン、add の場合は全トークン',
     },
   },
   required: ['mode', 'names'],
 }
 
-const { mode, names } = getArgs<{ mode: 'add' | 'update', names: string[] }>(ARGS_SCHEMA)
+const { mode, names } = getArgs<{ mode: 'add' | 'update'; names: string[] }>(ARGS_SCHEMA)
 
 const output = readFile(OUTPUT_PATH)
 const isInitialSetup = !output
@@ -37,7 +46,8 @@ const template = readFile(TEMPLATE_PATH)
 
 const VALUES_SCHEMA: Schema = {
   type: 'object',
-  description: '対象定数名をキー、確定値を値としたオブジェクト。確認・変更が不要な定数はキーごと含めない',
+  description:
+    '対象定数名をキー、確定値を値としたオブジェクト。確認・変更が不要な定数はキーごと含めない',
 }
 
 const finalValues = askUser<Record<string, string>>(
@@ -58,7 +68,7 @@ const finalValues = askUser<Record<string, string>>(
     現在の設定（無ければ未設定として扱う）:
     ${output || '(なし)'}
   `,
-  VALUES_SCHEMA
+  VALUES_SCHEMA,
 )
 
 if (Object.keys(finalValues).length === 0 && !isInitialSetup) {
@@ -68,11 +78,12 @@ if (Object.keys(finalValues).length === 0 && !isInitialSetup) {
 // ─── Phase 2: OUTPUT の作成・更新 ────────────────────────────
 phase('OUTPUT の作成・更新')
 
-const newContent = Object.keys(finalValues).length === 0
-  ? output!
-  : generate(
-      output
-        ? dedent`
+const newContent =
+  Object.keys(finalValues).length === 0
+    ? output!
+    : generate(
+        output
+          ? dedent`
             以下の既存内容のうち、次の値に該当する定数の宣言だけを更新してください（他の宣言はそのまま保持する）。
 
             既存内容:
@@ -81,7 +92,7 @@ const newContent = Object.keys(finalValues).length === 0
             更新する値:
             ${JSON.stringify(finalValues)}
           `
-        : dedent`
+          : dedent`
             以下のテンプレートと同じ構造（export const 宣言・JSDoc コメント・区切りコメント）で、
             次の値に該当する定数だけ値を置き換えて新規作成してください（それ以外はテンプレートの既定値のまま残す）。
 
@@ -90,8 +101,8 @@ const newContent = Object.keys(finalValues).length === 0
 
             更新する値:
             ${JSON.stringify(finalValues)}
-          `
-    )
+          `,
+      )
 
 writeFile(OUTPUT_PATH, newContent)
 

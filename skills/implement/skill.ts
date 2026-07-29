@@ -1,7 +1,15 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, runCommand, runTool, readFile, remember, respond, Schema } from '../_shared/complete.js'
-import { parseArgs } from '../_shared/args.js'
 import { TASK_TRACKER, TEST_POLICY_URL } from '../../local/project.js'
+import { parseArgs } from '../_shared/args.js'
+import {
+  type Schema,
+  complete,
+  readFile,
+  remember,
+  respond,
+  runCommand,
+  runTool,
+} from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 remember(['git commit・git push・PR 作成は絶対に行わないこと'])
 
@@ -36,7 +44,9 @@ switch (inputType) {
   case 'task_url':
     switch (TASK_TRACKER) {
       case 'notion':
-        content = runTool(`ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${arg}") を呼び出す`)
+        content = runTool(
+          `ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${arg}") を呼び出す`,
+        )
         break
       case 'github':
         content = runCommand([`gh issue view ${arg} --json title,body,comments`])
@@ -62,7 +72,7 @@ const includesTests = complete(
     実装内容:
     ${content}
   `,
-  { type: 'boolean' }
+  { type: 'boolean' },
 )
 
 let testPolicy = null

@@ -1,7 +1,7 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, remember, respond, askUser, Schema } from '../_shared/complete.js'
+import { BRANCH_FORMAT, TICKET_PREFIX, TYPES } from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
-import { TICKET_PREFIX, BRANCH_FORMAT, TYPES } from '../../local/project.js'
+import { type Schema, askUser, complete, remember, respond } from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 remember(['git switch / git branch は実行しないこと'])
 
@@ -26,8 +26,10 @@ const CANDIDATE_SCHEMA: Schema = {
   required: ['branchName'],
 }
 
-const candidates = ANGLES.map(angle => complete(
-  dedent`
+const candidates = ANGLES.map(
+  (angle) =>
+    complete(
+      dedent`
     以下の作業内容から、"${angle}" の切り口でブランチ名を1つ生成してください。
 
     ブランチ名の形式: "${BRANCH_FORMAT}"
@@ -37,8 +39,9 @@ const candidates = ANGLES.map(angle => complete(
     作業内容:
     ${input}
   `,
-  CANDIDATE_SCHEMA
-).branchName)
+      CANDIDATE_SCHEMA,
+    ).branchName,
+)
 
 // ─── Phase 3: 出力の整形 ─────────────────────────────────
 phase('出力の整形')

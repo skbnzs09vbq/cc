@@ -1,7 +1,7 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, generate, remember, respond, askUser, Schema } from '../_shared/complete.js'
-import { parseArgs } from '../_shared/args.js'
 import { RESEARCH_SOURCES } from '../../local/project.js'
+import { parseArgs } from '../_shared/args.js'
+import { type Schema, askUser, complete, generate, remember, respond } from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 remember([
   '書き込み・投稿・編集は一切行わず、読み取りのみ行うこと。write 系 MCP ツールは使用禁止',
@@ -34,9 +34,9 @@ const FINDING_SCHEMA: Schema = {
   items: {
     type: 'object',
     properties: {
-      type:   { type: 'string' },
-      value:  { type: 'string' },
-      label:  { type: ['string', 'null'] },
+      type: { type: 'string' },
+      value: { type: 'string' },
+      label: { type: ['string', 'null'] },
       result: {
         type: ['string', 'null'],
         description: '検索・取得結果。対応するツールが見つからない・取得できない場合は null',
@@ -56,7 +56,7 @@ const findings = complete(
     ソース一覧:
     ${JSON.stringify(RESEARCH_SOURCES)}
   `,
-  FINDING_SCHEMA
+  FINDING_SCHEMA,
 )
 
 // ─── Phase 3: 出力フォーマットへの整形 ────────────────────────
@@ -77,7 +77,7 @@ const output = generate(
 
     出力フォーマット:
     ${OUTPUT_FORMAT}
-  `
+  `,
 )
 
 respond(output)

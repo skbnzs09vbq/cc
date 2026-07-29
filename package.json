@@ -1,0 +1,13 @@
+{
+  "name": "claude-skills",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "biome lint .",
+    "format": "biome format .",
+    "format:write": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.2"
+  }
+}

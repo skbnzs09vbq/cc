@@ -67,7 +67,7 @@ export const AUTO_DEV_RATIO_ROADMAP = 2
 export const AUTO_DEV_ISSUE_MAX_ITERATIONS = 1
 
 /** 調査対象ソース一覧。type は読み取り専用 MCP ツールがある種別なら自由（slack・notion・github 等） */
-export const RESEARCH_SOURCES: { type: string, value: string, label?: string }[] = [
+export const RESEARCH_SOURCES: { type: string; value: string; label?: string }[] = [
   { type: 'slack', value: '#<channel>', label: '<説明>' },
   { type: 'notion', value: 'https://app.notion.com/p/<workspace>/<page-id>', label: '<説明>' },
 ]
@@ -122,4 +122,11 @@ export const ISSUE_TEMPLATE = `
 `
 
 /** sync-guidelines が使うカテゴリ名の例 */
-export const GUIDELINES_CATEGORY_EXAMPLES = ['型・定数', 'UI コンポーネント', '状態管理', 'API・バックエンド', 'UX', '差分・PR']
+export const GUIDELINES_CATEGORY_EXAMPLES = [
+  '型・定数',
+  'UI コンポーネント',
+  '状態管理',
+  'API・バックエンド',
+  'UX',
+  '差分・PR',
+]

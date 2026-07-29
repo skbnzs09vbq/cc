@@ -40,22 +40,21 @@ export function buildCommandPrompt(prompt: string, commands: string[]): string {
     結果が得られない場合・失敗した場合は null を返してください。
 
     実行コマンド:
-    ${commands.map(c => `  ${c}`).join('\n')}
+    ${commands.map((c) => `  ${c}`).join('\n')}
   `
 }
 
 export function runCommand(commands: string[]): string | null {
-  return complete(
-    buildCommandPrompt('その結果を返してください。', commands),
-    { type: ['string', 'null'] }
-  )
+  return complete(buildCommandPrompt('その結果を返してください。', commands), {
+    type: ['string', 'null'],
+  })
 }
 
 export function remember(notes: string[]) {
   complete(dedent`
     このスクリプトの実行全体を通して、以下の注意事項を守ってください。
 
-    ${notes.map(n => `- ${n}`).join('\n')}
+    ${notes.map((n) => `- ${n}`).join('\n')}
   `)
 }
 
@@ -72,6 +71,6 @@ export function runTool(tool: string): string | null {
 
       呼び出すツール: ${tool}
     `,
-    { type: ['string', 'null'] }
+    { type: ['string', 'null'] },
   )
 }

@@ -1,6 +1,6 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, remember, readFile, writeFile, respond, exit } from '../_shared/complete.js'
 import { parseArgs } from '../_shared/args.js'
+import { complete, exit, readFile, remember, respond, writeFile } from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 const COMMANDS_PATH = '.claude/local/commands.md'
 const input = parseArgs()
@@ -21,7 +21,7 @@ if (input) {
       コマンド:
       ${input}
     `,
-    { type: 'boolean' }
+    { type: 'boolean' },
   )
 
   if (alreadyExists) {
@@ -40,7 +40,7 @@ if (input) {
 
       追記するコマンド:
       ${input}
-    `
+    `,
   )
 
   writeFile(COMMANDS_PATH, updated)

@@ -1,6 +1,6 @@
-import { respond, runCommand, Schema } from '../_shared/complete.js'
-import { getArgs } from '../_shared/args.js'
 import { BASE_BRANCH } from '../../local/project.js'
+import { getArgs } from '../_shared/args.js'
+import { type Schema, respond, runCommand } from '../_shared/complete.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
@@ -8,12 +8,15 @@ const ARGS_SCHEMA: Schema = {
   type: 'object',
   properties: {
     issueNumber: { type: 'integer', description: 'worktree のキーとなる issue 番号' },
-    branch: { type: ['string', 'null'], description: 'チェックアウトする既存ブランチ名。新規 issue 対応でまだ無ければ null' },
+    branch: {
+      type: ['string', 'null'],
+      description: 'チェックアウトする既存ブランチ名。新規 issue 対応でまだ無ければ null',
+    },
   },
   required: ['issueNumber', 'branch'],
 }
 
-const { issueNumber, branch } = getArgs<{ issueNumber: number, branch: string | null }>(ARGS_SCHEMA)
+const { issueNumber, branch } = getArgs<{ issueNumber: number; branch: string | null }>(ARGS_SCHEMA)
 
 const worktreePath = `${WORKTREE_DIR}/issue-${issueNumber}`
 
@@ -24,7 +27,7 @@ if (!exists) {
   runCommand(
     branch
       ? ['git fetch origin', `git worktree add ${worktreePath} ${branch}`]
-      : ['git fetch origin', `git worktree add -d ${worktreePath} origin/${BASE_BRANCH}`]
+      : ['git fetch origin', `git worktree add -d ${worktreePath} origin/${BASE_BRANCH}`],
   )
 
   runCommand([

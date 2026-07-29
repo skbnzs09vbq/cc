@@ -1,10 +1,25 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, buildCommandPrompt, runCommand, writeFile, remember, respond, Schema } from '../_shared/complete.js'
+import {
+  BASE_BRANCH,
+  GUIDELINES,
+  LINT_COMMAND,
+  LINT_FIX_COMMAND,
+  MONOREPO_APPS_DIR,
+  PR_PATTERNS,
+  TAILWIND_CHECK,
+  TARGET_REPO,
+  TYPECHECK_COMMAND,
+} from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
 import {
-  BASE_BRANCH, TARGET_REPO, LINT_COMMAND, LINT_FIX_COMMAND,
-  TYPECHECK_COMMAND, MONOREPO_APPS_DIR, TAILWIND_CHECK, PR_PATTERNS, GUIDELINES,
-} from '../../local/project.js'
+  type Schema,
+  buildCommandPrompt,
+  complete,
+  remember,
+  respond,
+  runCommand,
+  writeFile,
+} from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 const modeArg = parseArgs()
 
@@ -18,7 +33,9 @@ if (mode === 'update') {
   // ─── Phase 1: PR 一覧取得 ─────────────────────────────────
   phase('PR一覧取得')
 
-  const prList = runCommand([`gh pr list --repo ${REPO} --state all --json number,title,state --limit 50`])
+  const prList = runCommand([
+    `gh pr list --repo ${REPO} --state all --json number,title,state --limit 50`,
+  ])
 
   // ─── Phase 2: コメント収集 ─────────────────────────────────
   phase('コメント収集')
@@ -34,7 +51,7 @@ if (mode === 'update') {
       ${prList}
 
       収集した全コメント・レビューを、どの PR・どのコメントかが分かる形でまとめて返してください。
-    `
+    `,
   )
 
   // ─── Phase 3: 投稿者種別で分類 ───────────────────────────────
@@ -67,7 +84,7 @@ if (mode === 'update') {
       コメント・レビュー:
       ${allComments}
     `,
-    CLASSIFIED_SCHEMA
+    CLASSIFIED_SCHEMA,
   )
 
   // ─── Phase 4: パターン集の更新 ───────────────────────────────
@@ -96,7 +113,7 @@ if (mode === 'update') {
       ${JSON.stringify(classified.humanReview)}
 
       更新後の ${PR_PATTERNS} の全文を返してください。
-    `
+    `,
   )
 
   writeFile(PR_PATTERNS, updatedPatterns)
@@ -113,7 +130,7 @@ if (mode === 'update') {
 
       更新後:
       ${updatedPatterns}
-    `
+    `,
   )
 
   respond(summary)
@@ -122,14 +139,19 @@ if (mode === 'update') {
   phase('前提ファイル確認')
 
   const prPatterns = runCommand([`cat ${PR_PATTERNS} 2>/dev/null || echo ""`])
-  const guidelines  = runCommand([`cat ${GUIDELINES} 2>/dev/null || echo ""`])
+  const guidelines = runCommand([`cat ${GUIDELINES} 2>/dev/null || echo ""`])
 
   // ─── Phase 2: 差分取得 ───────────────────────────────────────
   phase('差分取得')
 
   const diff = runCommand([`git diff ${BASE_BRANCH}...HEAD`])
-  const changedFilesRaw = runCommand([`git diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD`])
-  const changedFiles = (changedFilesRaw || '').split('\n').map(f => f.trim()).filter(Boolean)
+  const changedFilesRaw = runCommand([
+    `git diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD`,
+  ])
+  const changedFiles = (changedFilesRaw || '')
+    .split('\n')
+    .map((f) => f.trim())
+    .filter(Boolean)
   const filesArg = changedFiles.join(' ')
 
   // ─── Phase 3: lint ───────────────────────────────────────────
@@ -141,21 +163,26 @@ if (mode === 'update') {
   // ─── Phase 4: 型チェック ─────────────────────────────────────
   phase('型チェック')
 
-  const workspaces = MONOREPO_APPS_DIR === ''
-    ? ['.']
-    : [...new Set(
-        changedFiles
-          .filter(p => p.startsWith(`${MONOREPO_APPS_DIR}/`))
-          .map(p => p.split(`${MONOREPO_APPS_DIR}/`)[1].split('/')[0])
-      )]
+  const workspaces =
+    MONOREPO_APPS_DIR === ''
+      ? ['.']
+      : [
+          ...new Set(
+            changedFiles
+              .filter((p) => p.startsWith(`${MONOREPO_APPS_DIR}/`))
+              .map((p) => p.split(`${MONOREPO_APPS_DIR}/`)[1].split('/')[0]),
+          ),
+        ]
 
-  const typecheckResults = workspaces.map(workspace => ({
+  const typecheckResults = workspaces.map((workspace) => ({
     workspace,
-    result: runCommand([dedent`
+    result: runCommand([
+      dedent`
       cd ${MONOREPO_APPS_DIR}/${workspace}
       FILES=$(git -C ../.. diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD | sed -n 's|^${MONOREPO_APPS_DIR}/${workspace}/||p')
       ${TYPECHECK_COMMAND} 2>&1 | grep -F -f <(printf '%s\\n' "$FILES") || echo "変更ファイルに型エラーなし"
-    `]),
+    `,
+    ]),
   }))
 
   // ─── Phase 5: Tailwind arbitrary value チェック ─────────────
@@ -163,7 +190,8 @@ if (mode === 'update') {
 
   let tailwindResult = null
   if (TAILWIND_CHECK) {
-    tailwindResult = runCommand([dedent`
+    tailwindResult = runCommand([
+      dedent`
       git diff ${BASE_BRANCH}...HEAD -- '*.ts' '*.tsx' | grep '^+' | node -e '
       const px = /\\b(w|h|p[xytrbl]?|m[xytrbl]?|gap(?:-[xy])?|size|top|bottom|left|right|inset(?:-[xy])?|min-[wh]|max-[wh]|space-[xy])-\\[(\\d+)px\\]/g;
       const aspect = /\\baspect-\\[(\\d+)\\/(\\d+)\\]/g;
@@ -174,16 +202,18 @@ if (mode === 'update') {
         if (found.size === 0) console.log("Tailwind arbitrary value: 指摘なし ✓");
         else for (const [k, v] of found) console.log(\`\${k} → \${v}\`);
       });'
-    `])
+    `,
+    ])
   }
 
   // ─── Phase 6: パターン集・指針との照合 ───────────────────────
   phase('パターン集・指針照合')
 
-  const patternViolations = prPatterns ? Agent({
-    subagent_type: 'general-purpose',
-    description: 'PR レビューパターン集との照合',
-    prompt: dedent`
+  const patternViolations = prPatterns
+    ? Agent({
+        subagent_type: 'general-purpose',
+        description: 'PR レビューパターン集との照合',
+        prompt: dedent`
       以下の差分を PR レビューパターン集の各カテゴリと照合してください。
       推測で指摘せず、明確に該当するコードがある場合のみ報告してください（該当箇所・カテゴリ番号-項目番号・問題点・修正案を1件ずつ）。
       該当がなければ「該当なし」とだけ返してください。
@@ -194,12 +224,14 @@ if (mode === 'update') {
       差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
       ${diff}
     `,
-  }) : null
+      })
+    : null
 
-  const guidelineViolations = guidelines ? Agent({
-    subagent_type: 'general-purpose',
-    description: '実装指針との照合',
-    prompt: dedent`
+  const guidelineViolations = guidelines
+    ? Agent({
+        subagent_type: 'general-purpose',
+        description: '実装指針との照合',
+        prompt: dedent`
       以下の差分を実装指針（guidelines.md）の各指針と照合してください。
       パターン集・指針に記載のない汎用的な指摘（一般的な型エラー・スタイル等）は行わないでください（該当箇所・指針タイトル・問題点・修正案を1件ずつ）。
       該当がなければ「該当なし」とだけ返してください。
@@ -210,7 +242,8 @@ if (mode === 'update') {
       差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
       ${diff}
     `,
-  }) : null
+      })
+    : null
 
   // ─── Phase 7: code-review スキルによるレビュー ─────────────────
   phase('code-reviewスキルによるレビュー')
@@ -275,7 +308,7 @@ if (mode === 'update') {
 
       出力フォーマット（テンプレート）:
       ${OUTPUT_TEMPLATE}
-    `
+    `,
   )
 
   respond(output)

@@ -1,18 +1,29 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, generate, buildCommandPrompt, runCommand, askUser, respond, exit, Schema } from '../_shared/complete.js'
+import { BASE_BRANCH, ISSUE_TEMPLATE } from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
-import { ISSUE_TEMPLATE, BASE_BRANCH } from '../../local/project.js'
+import {
+  type Schema,
+  askUser,
+  buildCommandPrompt,
+  complete,
+  exit,
+  generate,
+  respond,
+  runCommand,
+} from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 const input = parseArgs()
 
 // ─── Phase 1: 項目抽出 ─────────────────────────────────────
 phase('項目抽出')
 
-const fieldNames = [...ISSUE_TEMPLATE.matchAll(/^#{1,2}\s+(.+)$/gm)].map(m => m[1].replace(/[{}]/g, '').trim())
+const fieldNames = [...ISSUE_TEMPLATE.matchAll(/^#{1,2}\s+(.+)$/gm)].map((m) =>
+  m[1].replace(/[{}]/g, '').trim(),
+)
 
 const FIELDS_SCHEMA: Schema = {
   type: 'object',
-  properties: Object.fromEntries(fieldNames.map(name => [name, { type: ['string', 'null'] }])),
+  properties: Object.fromEntries(fieldNames.map((name) => [name, { type: ['string', 'null'] }])),
   required: fieldNames,
 }
 
@@ -27,7 +38,7 @@ let fields = complete(
     ISSUE_TEMPLATE:
     ${ISSUE_TEMPLATE}
   `,
-  FIELDS_SCHEMA
+  FIELDS_SCHEMA,
 )
 
 // ─── Phase 2: 背景調査 ─────────────────────────────────────
@@ -39,7 +50,7 @@ const researchTopic = generate(dedent`
   ${input}
 `)
 
-Skill("research", researchTopic)
+Skill('research', researchTopic)
 
 // ─── Phase 3: 実装状況の確認 ───────────────────────────────
 phase('実装状況の確認')
@@ -51,7 +62,8 @@ const ALREADY_IMPLEMENTED_SCHEMA: Schema = {
   properties: {
     implemented: {
       type: 'boolean',
-      description: 'この issue で書こうとしている内容が、origin/{BASE_BRANCH} の最新コードにすでに実装済み（または一部実装済み）かどうか',
+      description:
+        'この issue で書こうとしている内容が、origin/{BASE_BRANCH} の最新コードにすでに実装済み（または一部実装済み）かどうか',
     },
     summary: {
       type: ['string', 'null'],
@@ -64,9 +76,9 @@ const ALREADY_IMPLEMENTED_SCHEMA: Schema = {
 const alreadyImplemented = complete(
   buildCommandPrompt(
     `origin/${BASE_BRANCH} の最新コードを確認し、この issue で書こうとしている内容がすでに実装済みでないか確認してください。`,
-    [`git log --oneline origin/${BASE_BRANCH} -20`, `git diff origin/${BASE_BRANCH}`]
+    [`git log --oneline origin/${BASE_BRANCH} -20`, `git diff origin/${BASE_BRANCH}`],
   ),
-  ALREADY_IMPLEMENTED_SCHEMA
+  ALREADY_IMPLEMENTED_SCHEMA,
 )
 
 if (alreadyImplemented.implemented) {
@@ -76,7 +88,7 @@ if (alreadyImplemented.implemented) {
       ${alreadyImplemented.summary}
       このまま issue 下書きの作成を続けますか？
     `,
-    { type: 'boolean' }
+    { type: 'boolean' },
   )
   if (!shouldContinue) {
     exit('既に実装済みの可能性があるため、issue 下書きの作成を中止しました。')
@@ -88,7 +100,7 @@ phase('不足項目の質問')
 
 const missingFields = complete(
   'fields のうち、根拠なく推測でしか埋められない項目を列挙してください。すべて確定できていれば null を返してください。',
-  { type: ['array', 'null'], items: { type: 'string' } }
+  { type: ['array', 'null'], items: { type: 'string' } },
 )
 
 if (missingFields) {
@@ -103,7 +115,7 @@ if (missingFields) {
       以下の項目は入力・調査だけでは判断できませんでした。教えてください。
       ${missingFields.map((f: string) => `- ${f}`).join('\n')}
     `,
-    ANSWERS_SCHEMA
+    ANSWERS_SCHEMA,
   )
   fields = { ...fields, ...answers }
 }
@@ -120,7 +132,7 @@ const issueDraft = generate(
 
     fields:
     ${JSON.stringify(fields)}
-  `
+  `,
 )
 
 respond(issueDraft)

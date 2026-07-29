@@ -1,7 +1,14 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, runCommand, remember, respond, Schema } from '../_shared/complete.js'
+import {
+  BASE_BRANCH,
+  PR_LANG,
+  PR_TEMPLATE_PATH,
+  PR_TITLE_FORMAT,
+  TICKET_PREFIX,
+  TYPES,
+} from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
-import { TICKET_PREFIX, BASE_BRANCH, PR_TEMPLATE_PATH, PR_TITLE_FORMAT, PR_LANG, TYPES } from '../../local/project.js'
+import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 remember(['gh pr create や git push は行わないこと'])
 
@@ -32,7 +39,7 @@ const type = complete(
 
     ${supplement ? `引数（issue 情報や補足）:\n${supplement}` : ''}
   `,
-  { type: 'string', enum: TYPES }
+  { type: 'string', enum: TYPES },
 )
 
 // ─── Phase 3: PR タイトル・description 生成 ──────────────────
@@ -78,13 +85,15 @@ const pr = complete(
 
     ${supplement ? `引数（issue 情報や補足。diff との整合性を確認した上で反映する）:\n${supplement}` : ''}
   `,
-  PR_SCHEMA
+  PR_SCHEMA,
 )
 
 // ─── Phase 4: 出力フォーマットへの整形 ────────────────────────
 phase('出力フォーマットへの整形')
 
-const output = '```text\n' + dedent`
+const output =
+  '```text\n' +
+  dedent`
   ## PR タイトル
 
   ${pr.title}
@@ -92,6 +101,7 @@ const output = '```text\n' + dedent`
   ## PR description
 
   ${pr.description}
-` + '\n```'
+` +
+  '\n```'
 
 respond(output)

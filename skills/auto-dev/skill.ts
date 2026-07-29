@@ -1,6 +1,24 @@
+import {
+  ASSIGNEE,
+  AUTO_DEV_ISSUE_MAX_ITERATIONS,
+  AUTO_DEV_MAX_CONCURRENT,
+  AUTO_DEV_RATIO_AUTO_DEV,
+  AUTO_DEV_RATIO_PR_REVIEW,
+  AUTO_DEV_RATIO_ROADMAP,
+  TARGET_REPO,
+  USE_AUTO_DEV,
+} from '../../local/project.js'
+import {
+  type Schema,
+  complete,
+  exit,
+  readFile,
+  remember,
+  respond,
+  runCommand,
+  writeFile,
+} from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
-import { respond, complete, remember, readFile, writeFile, runCommand, exit, Schema } from '../_shared/complete.js'
-import { USE_AUTO_DEV, TARGET_REPO, ASSIGNEE, AUTO_DEV_MAX_CONCURRENT, AUTO_DEV_RATIO_AUTO_DEV, AUTO_DEV_RATIO_PR_REVIEW, AUTO_DEV_RATIO_ROADMAP, AUTO_DEV_ISSUE_MAX_ITERATIONS } from '../../local/project.js'
 
 if (!USE_AUTO_DEV) {
   exit('このプロジェクトでは auto-dev が無効化されています（project.ts の USE_AUTO_DEV を確認）')
@@ -21,7 +39,7 @@ const alreadyScheduled = complete(
 
     ${cronList}
   `,
-  { type: 'boolean' }
+  { type: 'boolean' },
 )
 if (!alreadyScheduled) {
   CronCreate({ cron: '* * * * *', prompt: CRON_PROMPT, recurring: true })
@@ -35,23 +53,30 @@ type DirectWorkflowType = 'pr-review' | 'roadmap'
 const TARGET_RATIO: Record<WorkflowType, number> = {
   'auto-dev': AUTO_DEV_RATIO_AUTO_DEV,
   'pr-review': AUTO_DEV_RATIO_PR_REVIEW,
-  'roadmap': AUTO_DEV_RATIO_ROADMAP,
+  roadmap: AUTO_DEV_RATIO_ROADMAP,
 }
 
 type ScriptKind = 'issue' | 'pr-comment' | DirectWorkflowType
 
 const SCRIPT_PATHS: Record<ScriptKind, string> = {
-  'issue': '.claude/skills/auto-dev/issue-workflow.js',
+  issue: '.claude/skills/auto-dev/issue-workflow.js',
   'pr-comment': '.claude/skills/auto-dev/pr-comment-workflow.js',
   'pr-review': '.claude/skills/auto-dev/pr-review-workflow.js',
-  'roadmap': '.claude/skills/auto-dev/roadmap-workflow.js',
+  roadmap: '.claude/skills/auto-dev/roadmap-workflow.js',
 }
 
-type RunningEntry = { taskId: string; type: WorkflowType; kind: 'issue' | 'pr-comment' | null; target: string; worktreePath: string | null; launchedAt: string }
+type RunningEntry = {
+  taskId: string
+  type: WorkflowType
+  kind: 'issue' | 'pr-comment' | null
+  target: string
+  worktreePath: string | null
+  launchedAt: string
+}
 
 function formatRunning(entries: RunningEntry[]): string {
   if (entries.length === 0) return '(実行中の workflow なし)'
-  return entries.map(entry => `- ${entry.target} [${entry.kind || entry.type}]`).join('\n')
+  return entries.map((entry) => `- ${entry.target} [${entry.kind || entry.type}]`).join('\n')
 }
 
 // ─── Phase 1: 状態読み込み・プルーニング ─────────────────────────
@@ -60,8 +85,10 @@ phase('状態読み込み・プルーニング')
 const raw = readFile(STATE_PATH)
 const running: RunningEntry[] = raw ? JSON.parse(raw).running : []
 
-const stillRunning = running.filter(entry =>
-  String(TaskOutput({ task_id: entry.taskId, block: false, timeout: 0 })).includes('<status>running</status>')
+const stillRunning = running.filter((entry) =>
+  String(TaskOutput({ task_id: entry.taskId, block: false, timeout: 0 })).includes(
+    '<status>running</status>',
+  ),
 )
 
 writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
@@ -78,12 +105,12 @@ if (stillRunning.length >= AUTO_DEV_MAX_CONCURRENT) {
   exit()
 }
 
-const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, 'roadmap': 0 }
+const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, roadmap: 0 }
 for (const entry of stillRunning) counts[entry.type]++
 
 const nextType = (Object.keys(TARGET_RATIO) as WorkflowType[])
   .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
-  .reduce((best, t) => counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best)
+  .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
 
 // ─── Phase 3: workflow 起動 ────────────────────────────────────
 phase('workflow 起動')
@@ -107,7 +134,10 @@ const DETECTED_SCHEMA: Schema = {
           number: { type: 'integer' },
           url: { type: 'string' },
           branch: { type: 'string', description: 'PR の head ブランチ名（headRefName）' },
-          issueNumber: { type: 'integer', description: 'PR の本文・タイトルから読み取れる、対応元 issue の番号（"Closes #5" 等）' },
+          issueNumber: {
+            type: 'integer',
+            description: 'PR の本文・タイトルから読み取れる、対応元 issue の番号（"Closes #5" 等）',
+          },
         },
         required: ['number', 'url', 'branch', 'issueNumber'],
       },
@@ -116,10 +146,22 @@ const DETECTED_SCHEMA: Schema = {
   required: ['issues', 'prs'],
 }
 
-function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' | 'pr-comment'; target: string; worktreePath: string } | null {
-  const openIssues = runCommand([`gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title`])
-  const allPrs = runCommand([`gh pr list --repo ${TARGET_REPO} --state all --json number,title,body`])
-  const openPrs = runCommand([`gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,comments,reviews`])
+function resolveAutoDevTarget(): {
+  scriptPath: string
+  args: any
+  kind: 'issue' | 'pr-comment'
+  target: string
+  worktreePath: string
+} | null {
+  const openIssues = runCommand([
+    `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title`,
+  ])
+  const allPrs = runCommand([
+    `gh pr list --repo ${TARGET_REPO} --state all --json number,title,body`,
+  ])
+  const openPrs = runCommand([
+    `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,comments,reviews`,
+  ])
 
   const detected = complete<{ issues: any[]; prs: any[] }>(
     dedent`
@@ -139,15 +181,18 @@ function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' 
       ${ASSIGNEE} の open PR 一覧（コメント・レビュー情報つき）:
       ${openPrs}
     `,
-    DETECTED_SCHEMA
+    DETECTED_SCHEMA,
   )
 
-  const inProgress = stillRunning.map(entry => entry.target).join(' ')
-  const pr = detected.prs.find(pr => !inProgress.includes(`issue #${pr.issueNumber}`))
-  const issue = detected.issues.find(issue => !inProgress.includes(`issue #${issue.number}`))
+  const inProgress = stillRunning.map((entry) => entry.target).join(' ')
+  const pr = detected.prs.find((pr) => !inProgress.includes(`issue #${pr.issueNumber}`))
+  const issue = detected.issues.find((issue) => !inProgress.includes(`issue #${issue.number}`))
 
   if (pr) {
-    const worktreePath = Skill('create-worktree', `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`)
+    const worktreePath = Skill(
+      'create-worktree',
+      `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`,
+    )
     return {
       scriptPath: SCRIPT_PATHS['pr-comment'],
       args: { pr, worktreePath },
@@ -169,8 +214,16 @@ function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' 
   return null
 }
 
-function resolvePrReviewTarget(): { scriptPath: string; args: any; kind: null; target: string; worktreePath: string } | null {
-  const openPrsJson = runCommand([`gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,body`])
+function resolvePrReviewTarget(): {
+  scriptPath: string
+  args: any
+  kind: null
+  target: string
+  worktreePath: string
+} | null {
+  const openPrsJson = runCommand([
+    `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,body`,
+  ])
   const prs = JSON.parse(openPrsJson || '[]')
     .map((pr: any) => ({
       number: pr.number,
@@ -180,11 +233,14 @@ function resolvePrReviewTarget(): { scriptPath: string; args: any; kind: null; t
     }))
     .filter((pr: any) => pr.issueNumber)
 
-  const inProgress = stillRunning.map(entry => entry.target).join(' ')
+  const inProgress = stillRunning.map((entry) => entry.target).join(' ')
   const pr = prs.find((pr: any) => !inProgress.includes(`issue #${pr.issueNumber}`))
   if (!pr) return null
 
-  const worktreePath = Skill('create-worktree', `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`)
+  const worktreePath = Skill(
+    'create-worktree',
+    `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`,
+  )
   return {
     scriptPath: SCRIPT_PATHS['pr-review'],
     args: { pr, worktreePath },
@@ -226,7 +282,14 @@ if (!target) {
 const launch = Workflow({ scriptPath: target.scriptPath, args: target.args })
 const taskId = String(launch).match(/Task ID:\s*(\S+)/)?.[1] ?? ''
 
-stillRunning.push({ taskId, type: nextType, kind: target.kind, target: target.target, worktreePath: target.worktreePath, launchedAt: new Date().toISOString() })
+stillRunning.push({
+  taskId,
+  type: nextType,
+  kind: target.kind,
+  target: target.target,
+  worktreePath: target.worktreePath,
+  launchedAt: new Date().toISOString(),
+})
 writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
 
 counts[nextType]++

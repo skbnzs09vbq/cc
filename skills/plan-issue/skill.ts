@@ -1,11 +1,27 @@
-import { dedent } from '../_shared/utils.js'
-import { complete, generate, buildCommandPrompt, runCommand, readFile, writeFile, askUser, respond, exit, Schema } from '../_shared/complete.js'
+import {
+  ASSIGNEE,
+  BASE_BRANCH,
+  GUIDELINES,
+  PROJECT_ROOT,
+  PR_TITLE_FORMAT,
+  TARGET_REPO,
+  TASK_DIR,
+  TYPES,
+} from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
 import {
-  TARGET_REPO, BASE_BRANCH, PROJECT_ROOT,
-  ASSIGNEE, PR_TITLE_FORMAT, TYPES,
-  GUIDELINES, TASK_DIR,
-} from '../../local/project.js'
+  type Schema,
+  askUser,
+  buildCommandPrompt,
+  complete,
+  exit,
+  generate,
+  readFile,
+  respond,
+  runCommand,
+  writeFile,
+} from '../_shared/complete.js'
+import { dedent } from '../_shared/utils.js'
 
 const issueInput = parseArgs()
 
@@ -24,9 +40,9 @@ const ISSUE_SCHEMA: Schema = {
       type: ['string', 'null'],
       description: 'Issue の識別子（チケット番号等）。入力に含まれなければ null',
     },
-    title:       { type: 'string' },
+    title: { type: 'string' },
     description: { type: 'string' },
-    tasks:       { type: 'array', items: { type: 'string' } },
+    tasks: { type: 'array', items: { type: 'string' } },
   },
   required: ['id', 'title', 'description', 'tasks'],
 }
@@ -35,7 +51,7 @@ const issue = complete(
   issueInput.startsWith('http')
     ? `"${issueInput}" 種別の読み取り専用ツールを ToolSearch で探して fetch し、Issue 情報として構造化してください。`
     : `以下の入力を Issue 情報として解釈してください。\n\n入力: ${issueInput}`,
-  ISSUE_SCHEMA
+  ISSUE_SCHEMA,
 )
 
 const issueLabel = issue.id ? `${issue.title} (${issue.id})` : issue.title
@@ -52,7 +68,8 @@ const PR_DUPLICATE_SCHEMA: Schema = {
     },
     prs: {
       type: ['array', 'null'],
-      description: 'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）。false の場合は null',
+      description:
+        'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）。false の場合は null',
       items: { type: 'string' },
     },
   },
@@ -62,9 +79,11 @@ const PR_DUPLICATE_SCHEMA: Schema = {
 const prCheck = complete(
   buildCommandPrompt(
     `"${issueLabel}" と実装が重複しそうな open/draft PR がないか確認してください。`,
-    [`gh pr list --repo ${TARGET_REPO} --state open --json number,title,headRefName,isDraft --limit 50`]
+    [
+      `gh pr list --repo ${TARGET_REPO} --state open --json number,title,headRefName,isDraft --limit 50`,
+    ],
   ),
-  PR_DUPLICATE_SCHEMA
+  PR_DUPLICATE_SCHEMA,
 )
 
 if (prCheck.duplicate) {
@@ -74,14 +93,14 @@ if (prCheck.duplicate) {
       ${prCheck.prs.join('\n')}
       このまま計画を続けますか？
     `,
-    { type: 'boolean' }
+    { type: 'boolean' },
   )
   if (!shouldContinue) {
     exit('重複する PR がある可能性があるため、計画立案を中止しました。')
   }
 }
 
-const relatedContext = Skill("research", `"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
+const relatedContext = Skill('research', `"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
 
 const codeResult = generate(
   buildCommandPrompt(
@@ -98,8 +117,8 @@ const codeResult = generate(
       3. 変更が必要な箇所と影響範囲
       4. 依存関係・注意点
     `,
-    ['git fetch origin']
-  )
+    ['git fetch origin'],
+  ),
 )
 
 // ─── Phase 4: 計画立案 ───────────────────────────────────────
@@ -176,10 +195,14 @@ const planResult = complete(
     ## 既存作業との重複
     {PR・タスクとの重複があれば記載。なければ省略}
   `,
-  PLAN_SCHEMA
+  PLAN_SCHEMA,
 )
 
-const issueId = issue.id || generate(`"${issue.title}" から、ディレクトリ名に使える短い kebab-case のスラッグを生成してください。`)
+const issueId =
+  issue.id ||
+  generate(
+    `"${issue.title}" から、ディレクトリ名に使える短い kebab-case のスラッグを生成してください。`,
+  )
 const result = { issueId, planContent: planResult.planContent }
 let planContent = result.planContent
 
@@ -197,11 +220,11 @@ const isComplex = complete(
     実装計画:
     ${planContent}
   `,
-  { type: 'boolean' }
+  { type: 'boolean' },
 )
 
 if (isComplex) {
-  const critique = Skill("grill-with-docs")
+  const critique = Skill('grill-with-docs')
   planContent = complete(dedent`
     grill-with-docs の指摘を反映して実装計画を更新してください。
 
@@ -238,13 +261,13 @@ let approved = false
 while (!approved) {
   writeFile(`${planDir}plan.md`, planContent)
 
-  const response = askUser<{ approved: boolean, feedback: string | null }>(
+  const response = askUser<{ approved: boolean; feedback: string | null }>(
     dedent`
       計画を作成しました（${planDir}plan.md）。この内容で進めてよいですか？
 
       ${planContent}
     `,
-    APPROVAL_SCHEMA
+    APPROVAL_SCHEMA,
   )
 
   if (response.approved) {
