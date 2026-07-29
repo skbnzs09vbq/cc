@@ -1,6 +1,6 @@
 import { dedent } from '../_shared/utils.js'
 import { respond, complete, remember, readFile, writeFile, runCommand, exit, Schema } from '../_shared/complete.js'
-import { USE_AUTO_DEV, TARGET_REPO, ASSIGNEE, BASE_BRANCH, AUTO_DEV_MAX_CONCURRENT, AUTO_DEV_RATIO_AUTO_DEV, AUTO_DEV_RATIO_PR_REVIEW, AUTO_DEV_RATIO_ROADMAP, AUTO_DEV_ISSUE_MAX_ITERATIONS } from '../../local/project.js'
+import { USE_AUTO_DEV, TARGET_REPO, ASSIGNEE, AUTO_DEV_MAX_CONCURRENT, AUTO_DEV_RATIO_AUTO_DEV, AUTO_DEV_RATIO_PR_REVIEW, AUTO_DEV_RATIO_ROADMAP, AUTO_DEV_ISSUE_MAX_ITERATIONS } from '../../local/project.js'
 
 if (!USE_AUTO_DEV) {
   exit('このプロジェクトでは auto-dev が無効化されています（project.ts の USE_AUTO_DEV を確認）')
@@ -28,7 +28,6 @@ if (!alreadyScheduled) {
 }
 
 const STATE_PATH = '.claude/local/running-workflows.json'
-const WORKTREE_DIR = '.claude/local/worktrees'
 
 type WorkflowType = 'auto-dev' | 'pr-review' | 'roadmap'
 type DirectWorkflowType = 'pr-review' | 'roadmap'
@@ -117,11 +116,6 @@ const DETECTED_SCHEMA: Schema = {
   required: ['issues', 'prs'],
 }
 
-function worktreeExists(worktreePath: string): boolean {
-  const list = runCommand(['git worktree list --porcelain']) || ''
-  return list.includes(`worktree ${worktreePath}`)
-}
-
 function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' | 'pr-comment'; target: string; worktreePath: string } | null {
   const openIssues = runCommand([`gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title`])
   const allPrs = runCommand([`gh pr list --repo ${TARGET_REPO} --state all --json number,title,body`])
@@ -153,10 +147,7 @@ function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' 
   const issue = detected.issues.find(issue => !inProgress.includes(`issue #${issue.number}`))
 
   if (pr) {
-    const worktreePath = `${WORKTREE_DIR}/issue-${pr.issueNumber}`
-    if (!worktreeExists(worktreePath)) {
-      runCommand(['git fetch origin', `git worktree add ${worktreePath} ${pr.branch}`])
-    }
+    const worktreePath = Skill('create-worktree', `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`)
     return {
       scriptPath: SCRIPT_PATHS['pr-comment'],
       args: { pr, worktreePath },
@@ -166,10 +157,7 @@ function resolveAutoDevTarget(): { scriptPath: string; args: any; kind: 'issue' 
     }
   }
   if (issue) {
-    const worktreePath = `${WORKTREE_DIR}/issue-${issue.number}`
-    if (!worktreeExists(worktreePath)) {
-      runCommand(['git fetch origin', `git worktree add -d ${worktreePath} origin/${BASE_BRANCH}`])
-    }
+    const worktreePath = Skill('create-worktree', `issueNumber: ${issue.number}, branch: null`)
     return {
       scriptPath: SCRIPT_PATHS['issue'],
       args: { issue, worktreePath, maxIterations: AUTO_DEV_ISSUE_MAX_ITERATIONS },
@@ -196,10 +184,7 @@ function resolvePrReviewTarget(): { scriptPath: string; args: any; kind: null; t
   const pr = prs.find((pr: any) => !inProgress.includes(`issue #${pr.issueNumber}`))
   if (!pr) return null
 
-  const worktreePath = `${WORKTREE_DIR}/issue-${pr.issueNumber}`
-  if (!worktreeExists(worktreePath)) {
-    runCommand(['git fetch origin', `git worktree add ${worktreePath} ${pr.branch}`])
-  }
+  const worktreePath = Skill('create-worktree', `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`)
   return {
     scriptPath: SCRIPT_PATHS['pr-review'],
     args: { pr, worktreePath },
