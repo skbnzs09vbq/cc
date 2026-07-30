@@ -121,9 +121,23 @@ const openPrCount =
     ]),
   ) || 0
 
-if (openIssueCount === 0 && counts['direction'] > 0) {
+const MAX_CONCURRENT_DIRECTION = 1
+const DIRECTION_ISSUE_BACKLOG_LIMIT = 5
+
+const directionAllowed =
+  counts['direction'] < MAX_CONCURRENT_DIRECTION && openIssueCount < DIRECTION_ISSUE_BACKLOG_LIMIT
+
+const HAS_TARGET: Record<WorkflowType, boolean> = {
+  'auto-dev': openIssueCount > 0 || openPrCount > 0,
+  'pr-review': openPrCount > 0,
+  direction: directionAllowed,
+}
+
+const eligible = (Object.keys(TARGET_RATIO) as WorkflowType[]).filter((t) => HAS_TARGET[t])
+
+if (eligible.length === 0) {
   respond(dedent`
-    open issue 0件・direction 実行中のため、今回は新規起動しません
+    対応対象の issue・PR が無く、direction も起動条件（同時実行${MAX_CONCURRENT_DIRECTION}件まで・open issue ${DIRECTION_ISSUE_BACKLOG_LIMIT}件未満）を満たさないため、今回は新規起動しません
 
     実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
     ${formatRunning(stillRunning)}
@@ -131,19 +145,9 @@ if (openIssueCount === 0 && counts['direction'] > 0) {
   exit()
 }
 
-const HAS_TARGET: Record<WorkflowType, boolean> = {
-  'auto-dev': openIssueCount > 0 || openPrCount > 0,
-  'pr-review': openPrCount > 0,
-  direction: true,
-}
-
-const nextType: WorkflowType =
-  openIssueCount === 0
-    ? 'direction'
-    : (Object.keys(TARGET_RATIO) as WorkflowType[])
-        .filter((t) => HAS_TARGET[t])
-        .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
-        .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
+const nextType: WorkflowType = eligible
+  .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
+  .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
 
 // ─── Phase 3: workflow 起動 ────────────────────────────────────
 phase('workflow 起動')
@@ -202,7 +206,9 @@ function resolveAutoDevTarget(): {
       過去に処理済みかどうかは問わず、現時点で対応が必要なものすべてが対象です。
 
       - issue: 対応する PR（issue番号を本文かタイトルに含むもの）がまだ無いもの
-      - PR: 最新のコメント/レビューが ${ASSIGNEE} 以外のもの（＝未返信）。branch として headRefName を含める。
+      - PR: 未対応のコメント・レビュー指摘があるもの（投稿者が ${ASSIGNEE} 自身かどうかは問わない
+        最新のコメント/レビュー以降に、それへ対応した追加コミットがまだ無いものを対象とする）
+        branch として headRefName を含める。
         本文・タイトルから "Closes #5" 等の issue 参照を issueNumber として含める。参照が読み取れない PR は対象から除外する
 
       ${ASSIGNEE} の open issue 一覧:

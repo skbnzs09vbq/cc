@@ -88,20 +88,7 @@ const pr = complete(
   PR_SCHEMA,
 )
 
-// ─── Phase 4: 出力フォーマットへの整形 ────────────────────────
-phase('出力フォーマットへの整形')
+// ─── Phase 4: 出力 ─────────────────────────────────────────
+phase('出力')
 
-const output =
-  '```text\n' +
-  dedent`
-  ## PR タイトル
-
-  ${pr.title}
-
-  ## PR description
-
-  ${pr.description}
-` +
-  '\n```'
-
-respond(output)
+respond(pr.description)

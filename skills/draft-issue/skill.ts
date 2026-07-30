@@ -50,7 +50,7 @@ const researchTopic = generate(dedent`
   ${input}
 `)
 
-Skill('research', researchTopic)
+const researchResult = Skill('research', researchTopic)
 
 // ─── Phase 3: 実装状況の確認 ───────────────────────────────
 phase('実装状況の確認')
@@ -112,7 +112,8 @@ if (missingFields) {
 
   const answers = askUser<Record<string, string>>(
     dedent`
-      以下の項目は入力・調査だけでは判断できませんでした。教えてください。
+      以下の項目は入力・調査だけでは判断できませんでした
+      教えてください
       ${missingFields.map((f: string) => `- ${f}`).join('\n')}
     `,
     ANSWERS_SCHEMA,
@@ -125,13 +126,16 @@ phase('出力')
 
 const issueDraft = generate(
   dedent`
-    fields の内容を ISSUE_TEMPLATE に当てはめ、issue 下書き（タイトル＋本文）の Markdown を出力してください。
+    fields の内容を ISSUE_TEMPLATE に当てはめ、issue 下書き（タイトル＋本文）の Markdown を出力してください
 
     ISSUE_TEMPLATE:
     ${ISSUE_TEMPLATE}
 
     fields:
     ${JSON.stringify(fields)}
+
+    researchResult:
+    ${researchResult}
   `,
 )
 
