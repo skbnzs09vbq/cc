@@ -135,7 +135,80 @@ if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
   respond(`${RULES_PATH} に auto-dev 用ルールを追加しました`)
 }
 
-// ─── Phase 4: 初回コミット確認 ───────────────────────────────
+// ─── Phase 4: .gitignore の確認 ─────────────────────────────
+phase('.gitignoreの確認')
+
+const GITIGNORE_PATH = '.gitignore'
+const gitignoreContent = readFile(GITIGNORE_PATH)
+const hasClaudeEntry = (gitignoreContent || '')
+  .split('\n')
+  .some((line) => line.trim() === '.claude' || line.trim() === '.claude/')
+
+let addedClaudeEntry = hasClaudeEntry
+
+if (!hasClaudeEntry) {
+  const { addClaude } = askUser<{ addClaude: boolean }>(
+    dedent`
+      ${GITIGNORE_PATH} に .claudeが含まれていません
+      追加しますか？
+      追加しない場合は .claude をそのまま通常の git 管理下に置きます
+    `,
+    { type: 'object', properties: { addClaude: { type: 'boolean' } }, required: ['addClaude'] },
+  )
+
+  if (addClaude) {
+    writeFile(
+      GITIGNORE_PATH,
+      gitignoreContent ? `${gitignoreContent.trimEnd()}\n.claude\n` : '.claude\n',
+    )
+    respond(`${GITIGNORE_PATH} に .claude を追加しました`)
+    addedClaudeEntry = true
+  } else {
+    respond('.claude は git 管理下のままにします')
+  }
+}
+
+const gitignoreTracked =
+  addedClaudeEntry &&
+  runCommand([`git ls-files --error-unmatch ${GITIGNORE_PATH} >/dev/null 2>&1 && echo tracked`])?.trim() ===
+    'tracked'
+
+if (addedClaudeEntry && !gitignoreTracked) {
+  const { confirmed } = askUser<{ confirmed: boolean }>(
+    dedent`
+      ${GITIGNORE_PATH}（.claude を除外する設定）がまだコミットされていません
+      このままだと create-worktree が作る worktree はコミット済みの内容からチェックアウトされるため、
+      .claude が ignore されなくなり、誤って .claude ごとコミットされてしまいます
+
+      ${GITIGNORE_PATH} をコミットしてよいですか？
+    `,
+    { type: 'object', properties: { confirmed: { type: 'boolean' } }, required: ['confirmed'] },
+  )
+
+  if (confirmed) {
+    runCommand([`git add ${GITIGNORE_PATH}`, 'git commit -m "chore: ignore .claude"'])
+    respond(`${GITIGNORE_PATH} をコミットしました`)
+
+    const hasUpstream = runCommand(['git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null'])
+    if (!hasUpstream) {
+      const baseBranch = newContent.match(/BASE_BRANCH\s*=\s*['"]([^'"]+)['"]/)?.[1] || 'main'
+      const { confirmedPush } = askUser<{ confirmedPush: boolean }>(
+        `この内容を origin/${baseBranch}（project.ts の BASE_BRANCH）に push してよいですか？（worktree 作成には push 済みの状態が必要です）`,
+        { type: 'object', properties: { confirmedPush: { type: 'boolean' } }, required: ['confirmedPush'] },
+      )
+      if (confirmedPush) {
+        runCommand([`git push -u origin HEAD:${baseBranch}`])
+        respond('push しました')
+      } else {
+        respond('push は行いませんでした')
+      }
+    }
+  } else {
+    respond(`${GITIGNORE_PATH} のコミットは行いませんでした。コミットするまで .claude が worktree で ignore されない点に注意してください`)
+  }
+}
+
+// ─── Phase 5: 初回コミット確認 ───────────────────────────────
 phase('初回コミット確認')
 
 if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
@@ -175,7 +248,7 @@ if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
   }
 }
 
-// ─── Phase 5: 案内 ─────────────────────────────────────────
+// ─── Phase 6: 案内 ─────────────────────────────────────────
 phase('案内')
 
 if (/USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
