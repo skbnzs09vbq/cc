@@ -2,7 +2,7 @@
 # Claude Code PreToolUse hook (matcher: Bash). Reads the tool-call payload
 # from stdin, and if it's a `git commit` invocation happening inside the
 # .claude (cc.git) repo itself, blocks it (exit 2) unless verify-state is
-# up to date, so Claude runs the verify-project-info skill first.
+# up to date, so Claude runs the verify-no-project-leak skill first.
 # Commits elsewhere (e.g. a product-repo worktree) are left untouched.
 set -euo pipefail
 
@@ -33,5 +33,5 @@ if "$SCRIPT_DIR/check-verify-state.sh" 1>&2; then
   exit 0
 fi
 
-echo "git commit の前に verify-project-info スキルを実行してください（Skill(\"verify-project-info\")）。" >&2
+echo "git commit の前に verify-no-project-leak スキルを実行してください（Skill(\"verify-no-project-leak\")）。" >&2
 exit 2

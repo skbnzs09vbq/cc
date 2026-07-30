@@ -2,7 +2,7 @@
 # Shared check used by both the git pre-commit hook and the Claude Code
 # PreToolUse hook. Must be run with cwd = the .claude repo root.
 # Exit 0: project.example.ts / CLAUDE.md / agents / skills content matches
-#         the last verify-project-info run (safe to commit).
+#         the last verify-no-project-leak run (safe to commit).
 # Exit 1: unverified or changed since last verification (should block).
 set -euo pipefail
 
@@ -21,5 +21,5 @@ if [ -n "$current" ] && [ "$current" = "$verified" ]; then
 fi
 
 echo "project.example.ts / CLAUDE.md / agents / skills が前回検証時から変更されている（または未検証な）ため、コミットをブロックします。"
-echo "verify-project-info スキルを実行し、project固有の実値・秘密情報が無いことを確認してから再度コミットしてください。"
+echo "verify-no-project-leak スキルを実行し、project固有の実値・秘密情報が無いことを確認してから再度コミットしてください。"
 exit 1
