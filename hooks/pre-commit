@@ -5,4 +5,10 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$(git rev-parse --show-toplevel)"
+
+if [ "$("$SCRIPT_DIR/read-git-policy.sh")" = "no-commit" ]; then
+  echo "この .claude は commit 禁止に設定されています（.claude/local/git-policy.json）。setup スキルで方針を変更できます。" >&2
+  exit 1
+fi
+
 exec "$SCRIPT_DIR/check-verify-state.sh"

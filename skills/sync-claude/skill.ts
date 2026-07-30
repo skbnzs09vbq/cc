@@ -32,15 +32,23 @@ const remoteClaudePath = generate(dedent`
   確定した「.claude ディレクトリの絶対パス」だけを1行で返してください（説明文は不要）
 `).trim()
 
-const remoteExists = runCommand([`test -d "${remoteClaudePath}/.git" && echo yes || echo no`])?.trim()
+const remoteExists = runCommand([`test -d "${remoteClaudePath}" && echo yes || echo no`])?.trim()
 if (remoteExists !== 'yes') {
-  exit(`${remoteClaudePath} が見つからないか git リポジトリではありません`)
+  exit(`${remoteClaudePath} が見つかりません`)
 }
+
+const remoteIsGit = runCommand([`test -d "${remoteClaudePath}/.git" && echo yes || echo no`])?.trim() === 'yes'
 
 // ─── Phase 2: 差分検出 ─────────────────────────────────────
 phase('差分検出')
 
-const remoteFiles = (runCommand([`cd "${remoteClaudePath}" && git ls-files | sort`]) || '')
+const remoteFiles = (
+  runCommand([
+    remoteIsGit
+      ? `cd "${remoteClaudePath}" && git ls-files | sort`
+      : `cd "${remoteClaudePath}" && find . -type f -not -path './local/*' -not -path './.git/*' | sed 's|^\\./||' | sort`,
+  ]) || ''
+)
   .split('\n')
   .filter(Boolean)
 const localFiles = (runCommand(['cd .claude && git ls-files | sort']) || '')
@@ -70,7 +78,7 @@ phase('確認')
 
 const { confirmed } = askUser<{ confirmed: boolean }>(
   dedent`
-    ${remoteClaudePath} との差分（git管理下ファイルのみ）:
+    ${remoteClaudePath} との差分（local/ を除くファイルのみ）:
 
     追加される（今には無い）ファイル:
     ${added.join('\n') || '(なし)'}
@@ -96,7 +104,7 @@ phase('取り込み')
 
 runCommand([
   dedent`
-    cd "${remoteClaudePath}" && git ls-files | while IFS= read -r f; do
+    cd "${remoteClaudePath}" && printf '%s\\n' ${remoteFiles.map((f) => `"${f}"`).join(' ')} | while IFS= read -r f; do
       mkdir -p "$OLDPWD/.claude/$(dirname "$f")"
       cp "$f" "$OLDPWD/.claude/$f"
     done

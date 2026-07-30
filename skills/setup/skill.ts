@@ -210,7 +210,46 @@ if (/USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
   }
 }
 
-// ─── Phase 5: 初回コミット確認 ───────────────────────────────
+// ─── Phase 5: .claude のgit管理方針 ───────────────────────────
+phase('.claudeのgit管理方針')
+
+const CLAUDE_IS_GIT = runCommand(['test -d .claude/.git && echo yes || echo no'])?.trim() === 'yes'
+const GIT_POLICY_PATH = '.claude/local/git-policy.json'
+
+if (CLAUDE_IS_GIT) {
+  const currentPolicyRaw = readFile(GIT_POLICY_PATH)
+  const currentPolicy = currentPolicyRaw ? JSON.parse(currentPolicyRaw).mode : 'normal'
+
+  const { gitPolicy } = askUser<{ gitPolicy: 'no-git' | 'no-commit' | 'normal' }>(
+    dedent`
+      .claude 自身の git 管理方針を選んでください（現在: ${currentPolicy}）
+
+      1. no-git: .claude 内の .git を削除する（更新履歴を持たず、sync-claude スキルで他環境から取り込む運用向け）
+      2. no-commit: .git は残すが commit・push を禁止する（履歴の参照・pull はできるが書き込みは不可）
+      3. normal: 通常通り commit・push できる（デフォルト）
+    `,
+    {
+      type: 'object',
+      properties: { gitPolicy: { type: 'string', enum: ['no-git', 'no-commit', 'normal'] } },
+      required: ['gitPolicy'],
+    },
+  )
+
+  if (gitPolicy === 'no-git') {
+    runCommand(['rm -rf .claude/.git'])
+    respond('.claude/.git を削除しました（以後 .claude は通常のフォルダとして扱われます）')
+  } else {
+    writeFile(GIT_POLICY_PATH, JSON.stringify({ mode: gitPolicy }, null, 2))
+    runCommand(['git -C .claude config core.hooksPath hooks'])
+    respond(
+      gitPolicy === 'no-commit'
+        ? '.claude では commit・push がブロックされるようになりました'
+        : '.claude は通常通り commit・push できます',
+    )
+  }
+}
+
+// ─── Phase 6: 初回コミット確認 ───────────────────────────────
 phase('初回コミット確認')
 
 if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
@@ -250,7 +289,7 @@ if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
   }
 }
 
-// ─── Phase 6: 案内 ─────────────────────────────────────────
+// ─── Phase 7: 案内 ─────────────────────────────────────────
 phase('案内')
 
 if (/USE_AUTO_DEV\s*=\s*true/.test(newContent)) {

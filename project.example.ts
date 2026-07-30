@@ -15,6 +15,9 @@ export const BASE_BRANCH = 'main'
 /** リポジトリのローカル絶対パス */
 export const PROJECT_ROOT = '/path/to/project'
 
+/** create-worktree が新規 worktree 作成後にフォルダを追加する VSCode の .code-workspace ファイルの絶対パス（任意）。空文字なら何もしない */
+export const VSCODE_WORKSPACE_FILE = ''
+
 /** タスク管理ツールの種類 */
 export const TASK_TRACKER: 'notion' | 'github' | 'linear' | 'backlog' | '' = 'github'
 
@@ -35,6 +38,9 @@ export const PR_PATTERNS = '.claude/local/pr-review-patterns.md'
 
 /** issue ごとの作業ディレクトリ */
 export const TASK_DIR = '.claude/local/tasks/'
+
+/** create-worktree が新規 worktree 作成後に順番に実行するセットアップコマンド一覧（依存インストール・ビルド等）。空配列なら何も実行しない */
+export const WORKTREE_SETUP_COMMANDS: string[] = []
 
 /** lint コマンド。{files} は変更ファイル一覧 */
 export const LINT_COMMAND = 'npx eslint {files}'

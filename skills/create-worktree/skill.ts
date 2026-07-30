@@ -1,6 +1,12 @@
-import { BASE_BRANCH, TICKET_PREFIX } from '../../local/project.js'
+import {
+  BASE_BRANCH,
+  PROJECT_ROOT,
+  TICKET_PREFIX,
+  VSCODE_WORKSPACE_FILE,
+  WORKTREE_SETUP_COMMANDS,
+} from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, respond, runCommand } from '../_shared/complete.js'
+import { type Schema, readFile, respond, runCommand, writeFile } from '../_shared/complete.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
@@ -39,6 +45,30 @@ if (!exists) {
     `[ -f .claude/local/guidelines.md ] && cp .claude/local/guidelines.md ${worktreePath}/.claude/local/guidelines.md || true`,
     `[ -f .claude/local/pr-review-patterns.md ] && cp .claude/local/pr-review-patterns.md ${worktreePath}/.claude/local/pr-review-patterns.md || true`,
   ])
+
+  if (WORKTREE_SETUP_COMMANDS.length > 0) {
+    runCommand(WORKTREE_SETUP_COMMANDS.map((command: string) => `cd ${worktreePath} && ${command}`))
+  }
+
+  if (VSCODE_WORKSPACE_FILE) {
+    const absoluteWorktreePath = `${PROJECT_ROOT}/${worktreePath}`
+    const workspaceContent = readFile(VSCODE_WORKSPACE_FILE)
+
+    if (workspaceContent) {
+      const workspace = JSON.parse(workspaceContent)
+      const alreadyAdded = workspace.folders.some(
+        (folder: { path: string }) => folder.path === absoluteWorktreePath,
+      )
+
+      if (!alreadyAdded) {
+        workspace.folders.push({
+          path: absoluteWorktreePath,
+          name: `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`,
+        })
+        writeFile(VSCODE_WORKSPACE_FILE, JSON.stringify(workspace, null, 2))
+      }
+    }
+  }
 }
 
 respond(worktreePath)

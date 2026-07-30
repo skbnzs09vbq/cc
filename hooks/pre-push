@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# git pre-push hook. Activated together with pre-commit via:
+#   git config core.hooksPath hooks
+# Blocks push outright when the "no-commit" git policy is set, as defense
+# in depth in case commits already exist locally despite pre-commit.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$(git rev-parse --show-toplevel)"
+
+if [ "$("$SCRIPT_DIR/read-git-policy.sh")" = "no-commit" ]; then
+  echo "この .claude は push 禁止に設定されています（.claude/local/git-policy.json）。setup スキルで方針を変更できます。" >&2
+  exit 1
+fi
+
+exit 0
