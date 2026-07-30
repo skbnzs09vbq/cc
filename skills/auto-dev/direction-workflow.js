@@ -1,10 +1,11 @@
 export const meta = {
   name: 'auto-dev-direction',
-  description: '仕様と実装状況を把握し、1つの観点に絞って足りない部分をissueとして作成する（粒度を細かく分け、複数作成する）',
+  description:
+    'Understand the spec and implementation status, pick one angle, and create issues for what is missing (split into fine-grained, multiple issues)',
   phases: [
-    { title: '仕様・現状把握' },
-    { title: '次issue判定' },
-    { title: 'issue作成' },
+    { title: 'Spec & current state' },
+    { title: 'Next issue selection' },
+    { title: 'Issue creation' },
   ],
 }
 
@@ -18,14 +19,14 @@ function dedent(strings, ...values) {
 const MAX_ISSUE_COUNT = 15
 
 const GRANULARITY_NOTE = dedent`
-  - 対象は不足している観点（例: 特定の機能領域・レイヤー・仕様の一部分など）を1つだけ選び、その観点の範囲内でのみ探してください（他の観点は次回以降に回してよい。今回見つけた範囲をすべてissue化しようとしないこと）
-  - 選んだ観点の中で見つかった課題は、できるだけ粒度を細かく分割し、複数のissue候補として提案してください
-  - ただし同時に実装しないと技術的に問題がある（強い依存関係がある等）場合のみ、1つのissueにまとめてください
-  - 提案するissue候補は多くても${MAX_ISSUE_COUNT}件程度にしてください
-  - 各issueに priority（high/middle/low）を付けてください。技術選定・雛形構築など他の多くのissueの前提となる「土台」issueは high、その土台issueの完了が前提となる（他issueに依存する）issueは low、それ以外（依存が無い・独立して進められる）は middle としてください
-  - 技術選定がまだ済んでいない場合は、ここで言語・フレームワーク・内部DB・ORM・マイグレーションツール等を具体的に（バージョン・ライブラリ名を含めて）1つに確定し、description に明記してください。「選定してください」のような、実装者に選定をやり直させる曖昧な指示は禁止です
-    - 既存 open issue の本文に既に技術の記載があれば、それを踏襲して一貫性を保ってください
-    - 仕様側（Notionなど）の記述と .claude/local/project.ts の LINT_COMMAND・TYPECHECK_COMMAND（実際にこの環境で検証可能な言語ツールチェイン）が食い違う場合は、検証可能な方を優先し、矛盾があった旨と判断理由を description に明記してください
+  - Pick exactly one missing angle (e.g. a specific feature area, layer, or part of the spec) and search only within that angle (other angles can be left for next time — do not try to turn everything you found this round into issues)
+  - Split what you find within the chosen angle into as fine-grained issue candidates as possible
+  - Only bundle work into a single issue when it must be implemented together for technical reasons (e.g. a hard dependency)
+  - Propose at most ${MAX_ISSUE_COUNT} issue candidates
+  - Assign each issue a priority (high/middle/low). A "foundation" issue that other issues depend on (e.g. tech selection, scaffolding) is high; an issue that depends on such a foundation issue being done first is low; everything else (no dependency, can proceed independently) is middle
+  - If a technology choice has not been made yet, decide it concretely here (language, framework, internal DB, ORM, migration tool, etc., including versions and library names) and state it in description. Vague instructions like "please choose" that leave the choice to the implementer are forbidden
+    - If an existing open issue's body already states a technology choice, follow it for consistency
+    - If the spec (e.g. Notion) and .claude/local/project.ts's LINT_COMMAND/TYPECHECK_COMMAND (the language toolchain actually verifiable in this environment) disagree, prefer the verifiable one and state the discrepancy and your reasoning in description
 `
 
 const ITEMS_SCHEMA = {
@@ -38,165 +39,147 @@ const ITEMS_SCHEMA = {
         properties: {
           title: { type: 'string' },
           description: { type: 'string' },
-          rationale: { type: 'string', description: 'なぜ今このissueが必要か' },
+          rationale: { type: 'string', description: 'Why this issue is needed now' },
           priority: {
             type: 'string',
             enum: ['high', 'middle', 'low'],
-            description: '他issueの前提となる土台issueはhigh、他issueの完了に依存するissueはlow、それ以外はmiddle',
+            description:
+              'A foundation issue other issues depend on is high; an issue that depends on another issue being done is low; everything else is middle',
           },
         },
         required: ['title', 'description', 'rationale', 'priority'],
       },
-      description: '次に着手すべき issue 候補一覧（無ければ空配列）',
+      description: 'List of issue candidates to work on next (empty array if none)',
     },
   },
   required: ['items'],
 }
 
-const DRAFT_SCHEMA = {
-  type: 'object',
-  properties: {
-    aborted: { type: 'boolean' },
-    reason: { type: ['string', 'null'] },
-    draft: { type: ['string', 'null'], description: 'issue下書き（1行目がタイトル、以降が本文）の Markdown' },
-  },
-  required: ['aborted', 'reason', 'draft'],
-}
-
-// ─── Phase 1: 仕様・現状把握 ──────────────────────────────────
-phase('仕様・現状把握')
+// ─── Phase 1: Spec & current state ──────────────────────────────
+phase('Spec & current state')
 
 const specResearch = await agent(
   dedent`
-    Skill("research", "プロジェクト全体の仕様・要件") を実行し、仕様に関する情報を取得してください
-    取得した内容をそのまま返してください
+    Run Skill("research", "project-wide spec/requirements") and fetch information about the spec
+    Return the fetched content as-is
   `,
-  { phase: '仕様・現状把握', label: '仕様調査' }
+  { phase: 'Spec & current state', label: 'Spec research' }
 )
 
 const existingIssues = await agent(
   dedent`
-    .claude/local/project.ts の TARGET_REPO を確認し、
-    gh issue list --repo <TARGET_REPO> --state open --json title,body を実行し、結果をそのまま返してください
+    Check TARGET_REPO in .claude/local/project.ts, then run
+    gh issue list --repo <TARGET_REPO> --state open --json title,body and return the result as-is
   `,
-  { phase: '仕様・現状把握', label: '既存issue確認' }
+  { phase: 'Spec & current state', label: 'Existing issues check' }
 )
 
-// ─── Phase 2: 次issue判定 ─────────────────────────────────────
-phase('次issue判定')
+// ─── Phase 2: Next issue selection ──────────────────────────────
+phase('Next issue selection')
 
 let implementationStatus = null
 let items = (await agent(
   dedent`
-    以下の仕様調査結果と既存 open issue を比較し、まだ issue 化されていない不足機能があれば
-    次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
+    Compare the spec research below with existing open issues, and if there are missing features
+    that have not been turned into issues yet, propose them as the next issue candidates (empty items array if none)
 
     ${GRANULARITY_NOTE}
 
-    仕様調査結果:
+    Spec research:
     ${specResearch}
 
-    既存 open issue:
+    Existing open issues:
     ${existingIssues}
   `,
-  { schema: ITEMS_SCHEMA, phase: '次issue判定', label: '不足機能の判定' }
+  { schema: ITEMS_SCHEMA, phase: 'Next issue selection', label: 'Missing feature judgment' }
 )).items
 
 if (items.length === 0) {
   implementationStatus = await agent(
     dedent`
-      .claude/local/project.ts の PROJECT_ROOT・GUIDELINES を確認し、プロジェクト全体の実装状況を調査してください
-      （ディレクトリ構成・主要機能ごとの実装状況・未実装/TODO/既知の課題・コード品質や設計上の問題点を含む
-      仕様に明記された機能に限らず、調査で見つかった問題点・技術的負債も対象にする）
-      調査結果をそのまま返してください
+      Check PROJECT_ROOT/GUIDELINES in .claude/local/project.ts and investigate the overall implementation status of the project
+      (directory structure, implementation status per major feature, unimplemented/TODO/known issues, code quality and design problems —
+      not limited to features explicitly stated in the spec; also include problems/technical debt found during investigation)
+      Return the investigation result as-is
     `,
-    { phase: '次issue判定', label: '実装状況調査' }
+    { phase: 'Next issue selection', label: 'Implementation status research' }
   )
 
   items = (await agent(
     dedent`
-      以下の仕様調査結果・実装状況をもとに、足りないと判断した部分があれば
-      次に着手すべき issue 候補として提案してください（無ければ items を空配列にしてください）
-      既存 open issue とは重複させないでください
+      Based on the spec research and implementation status below, if there are parts you judge to be missing,
+      propose them as the next issue candidates (empty items array if none)
+      Do not duplicate existing open issues
 
       ${GRANULARITY_NOTE}
 
-      仕様調査結果:
+      Spec research:
       ${specResearch}
 
-      実装状況:
+      Implementation status:
       ${implementationStatus}
 
-      既存 open issue:
+      Existing open issues:
       ${existingIssues}
     `,
-    { schema: ITEMS_SCHEMA, phase: '次issue判定', label: '実装不足の判定' }
+    { schema: ITEMS_SCHEMA, phase: 'Next issue selection', label: 'Implementation gap judgment' }
   )).items
 }
 
 if (items.length === 0) {
   const existingPrs = await agent(
     dedent`
-      .claude/local/project.ts の TARGET_REPO を確認し、
-      gh pr list --repo <TARGET_REPO> --state open --json number,title,mergeable,url を実行し、結果をそのまま返してください
+      Check TARGET_REPO in .claude/local/project.ts, then run
+      gh pr list --repo <TARGET_REPO> --state open --json number,title,mergeable,url and return the result as-is
     `,
-    { phase: '次issue判定', label: '既存PR確認' }
+    { phase: 'Next issue selection', label: 'Existing PR check' }
   )
 
   items = (await agent(
     dedent`
-      以下の open PR 一覧を確認し、問題点（コンフリクト等）があれば、それを解消するための
-      issue 候補として提案してください（無ければ items を空配列にしてください）
-      提案するissue候補は多くても${MAX_ISSUE_COUNT}件程度にしてください
+      Check the open PR list below, and if there are problems (e.g. conflicts), propose issue candidates
+      to resolve them (empty items array if none)
+      Propose at most ${MAX_ISSUE_COUNT} issue candidates
 
-      open PR 一覧:
+      Open PR list:
       ${existingPrs}
     `,
-    { schema: ITEMS_SCHEMA, phase: '次issue判定', label: 'PRの問題点判定' }
+    { schema: ITEMS_SCHEMA, phase: 'Next issue selection', label: 'PR problem judgment' }
   )).items
 }
 
-log(`次のissue候補 ${items.length}件`)
+log(`${items.length} next issue candidate(s)`)
 
-// ─── Phase 3: issue作成 ───────────────────────────────────────
-phase('issue作成')
+// ─── Phase 3: Issue creation ────────────────────────────────────
+phase('Issue creation')
 
 const toCreate = items.slice(0, MAX_ISSUE_COUNT)
 
 const created = await pipeline(
   toCreate,
 
-  item => agent(
-    dedent`
-      issueにしたい内容:
-      タイトル案: ${item.title}
-      内容: ${item.description}
-      理由: ${item.rationale}
-    `,
-    { agentType: 'draft-issue', schema: DRAFT_SCHEMA, phase: 'issue作成', label: item.title }
-  ),
-
-  async (draftResult, item) => {
-    if (draftResult.aborted) return `${item.title}: 中止（${draftResult.reason}）`
-
-    const url = await agent(
+  item =>
+    agent(
       dedent`
-        以下の issue 下書きから、.claude/local/project.ts の TARGET_REPO・ASSIGNEE を確認してから gh issue create を実行し、
-        実際に issue を作成してください（1行目をタイトル、残りを本文として扱う）
-        タイトルの先頭に "[${item.priority}] " を付与してください（例: "[high] 内部DB..."）
-        --add-assignee <ASSIGNEE> フラグで ASSIGNEE を指定して、作成と同時にアサインしてください
-        本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出す等、安全な方法で実行してください
-        作成した issue の URL を返してください
+        Check TARGET_REPO/ASSIGNEE in .claude/local/project.ts, then run gh issue create
+        to actually create an issue with the following content.
 
-        下書き:
-        ${draftResult.draft}
+        Title: [${item.priority}] ${item.title}
+        Body (Markdown):
+        ## Description
+        ${item.description}
+
+        ## Rationale
+        ${item.rationale}
+
+        Specify ASSIGNEE via the --add-assignee <ASSIGNEE> flag so it is assigned at creation time
+        The body may contain newlines/quotes, so use a safe method such as writing it to a temp file
+        Return the URL of the created issue
       `,
-      { phase: 'issue作成', label: `${item.title} 作成` }
-    )
-    return `${item.title}: 作成（${url}）`
-  }
+      { phase: 'Issue creation', label: `Create: ${item.title}` }
+    ).then((url) => `${item.title}: created (${url})`)
 )
 
-log(`issue ${created.filter(Boolean).length}件を処理`)
+log(`Processed ${created.filter(Boolean).length} issue(s)`)
 
 return { created: created.filter(Boolean) }
