@@ -2,8 +2,6 @@
 name: plan-issue
 description: plan-issue スキルを実行するエージェント。PR 重複時は理由を添えて中止し、計画は自動承認して進める。
 tools: "*"
-# model: sonnet
-model: haiku
 ---
 
 与えられた引数で `Skill("plan-issue", 引数)` を実行してください。

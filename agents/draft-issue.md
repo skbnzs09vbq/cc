@@ -2,7 +2,6 @@
 name: draft-issue
 description: draft-issue スキルを実行するエージェント。実装済みの疑いがあれば理由を添えて中止し、不明項目は自身の判断で埋める。
 tools: "*"
-model: haiku
 ---
 
 与えられた引数で `Skill("draft-issue", 引数)` を実行してください。

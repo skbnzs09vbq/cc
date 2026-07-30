@@ -144,9 +144,15 @@ if (mode === 'update') {
   // ─── Phase 2: 差分取得 ───────────────────────────────────────
   phase('差分取得')
 
-  const diff = runCommand([`git diff ${BASE_BRANCH}...HEAD`])
+  const diff = runCommand([`git diff ${BASE_BRANCH}...HEAD -- . ':!.claude'`])
   const changedFilesRaw = runCommand([
-    `git diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD`,
+    dedent`
+      git diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD | while read -r f; do
+        [[ "$f" == .claude/* ]] && continue
+        git check-ignore -q "$f" && continue
+        echo "$f"
+      done
+    `,
   ])
   const changedFiles = (changedFilesRaw || '')
     .split('\n')

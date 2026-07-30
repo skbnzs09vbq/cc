@@ -33,13 +33,40 @@ const REVIEW_STATUS_SCHEMA = {
   required: ['hasComments', 'allResolved'],
 }
 
+const FINDING_ITEM_SCHEMA = {
+  type: 'object',
+  properties: {
+    path: { type: 'string', description: 'リポジトリルートからの相対パス' },
+    line: { type: 'integer', description: '指摘対象の行番号（diffの新しい側の行番号）' },
+    title: { type: 'string' },
+    body: { type: 'string', description: '問題点と修正案' },
+  },
+  required: ['path', 'line', 'title', 'body'],
+}
+
 const CHECK_SCHEMA = {
   type: 'object',
   properties: {
     clean: { type: 'boolean' },
-    findings: { type: ['string', 'null'] },
+    findings: {
+      type: 'array',
+      items: FINDING_ITEM_SCHEMA,
+      description: 'clean が false の場合の指摘一覧（ファイル・行ごとに分割する。無ければ空配列）',
+    },
   },
   required: ['clean', 'findings'],
+}
+
+const NEW_FINDINGS_SCHEMA = {
+  type: 'object',
+  properties: {
+    newFindings: {
+      type: 'array',
+      items: FINDING_ITEM_SCHEMA,
+      description: '既存のレビューコメントとまだ重複していない、本当に新しい指摘だけ（無ければ空配列）',
+    },
+  },
+  required: ['newFindings'],
 }
 
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
@@ -167,16 +194,46 @@ if (!resolved) {
     const { merged, note } = await mergeAndVerify(pr)
     result = merged ? `pr #${pr.number}: 指摘なし、マージ完了` : `pr #${pr.number}: 指摘なしだが未マージ（${note}）`
   } else {
-    await agent(
-      dedent`
-        PR #${pr.number} の code-review で指摘が見つかりました
-        以下の内容を gh pr comment で投稿してください
-
-        ${codeReview.findings}
-      `,
-      { phase: 'コードレビュー', label: `pr #${pr.number} code-review指摘` }
+    const existingComments = await agent(
+      `gh api repos/{owner}/{repo}/pulls/${pr.number}/comments を実行し、既存のインラインレビューコメント一覧（path・line・body）をそのまま返してください`,
+      { phase: 'コードレビュー', label: `pr #${pr.number} 既存コメント取得` }
     )
-    result = `pr #${pr.number}: code-review で指摘あり`
+
+    const dedup = await agent(
+      dedent`
+        以下の「今回の指摘一覧」と「既存のレビューコメント」を照合し、
+        既に同じ内容が投稿済みの指摘（path・line が近く、内容が実質同じもの）を除いた、
+        本当に新しい指摘だけを返してください（無ければ空配列）
+
+        今回の指摘一覧:
+        ${JSON.stringify(codeReview.findings)}
+
+        既存のレビューコメント:
+        ${existingComments}
+      `,
+      { schema: NEW_FINDINGS_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出` }
+    )
+
+    if (dedup.newFindings.length === 0) {
+      result = `pr #${pr.number}: code-review で指摘あり（すべて投稿済みのため新規コメントなし）`
+    } else {
+      await agent(
+        dedent`
+          ${WORKDIR_NOTE}
+
+          PR #${pr.number} に、以下の指摘をインラインレビューコメントとして投稿してください。
+          gh pr view ${pr.number} --json headRefOid で最新コミットのSHAを取得したうえで、
+          gh api repos/{owner}/{repo}/pulls/${pr.number}/reviews --method POST -f event=COMMENT
+          -f commit_id=<取得したSHA> -f 'comments[][path]=...' のように、まとめて1回のレビューで
+          インラインコメントとして投稿してください（1件ずつ gh pr comment で本文コメントにしないこと）
+
+          投稿する指摘（各要素 path・line・title・body）:
+          ${JSON.stringify(dedup.newFindings)}
+        `,
+        { phase: 'コードレビュー', label: `pr #${pr.number} インラインコメント投稿` }
+      )
+      result = `pr #${pr.number}: code-review で新規指摘 ${dedup.newFindings.length}件を投稿`
+    }
   }
 } else {
   // ─── Phase 3: マージ ──────────────────────────────────────

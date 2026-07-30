@@ -13,6 +13,8 @@ import { dedent } from '../_shared/utils.js'
 
 remember(['git commit・git push・PR 作成は絶対に行わないこと'])
 
+const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
+
 // ─── Phase 1: 指摘収集 ─────────────────────────────────────
 phase('指摘収集')
 
@@ -34,10 +36,10 @@ const input = url || askUser('対象の GitHub PR URL を教えてください�
 const prNumber = generate(`"${input}" から PR 番号を抽出してください。`)
 
 const reviewComments = runCommand([
-  `gh api repos/${TARGET_REPO}/pulls/${prNumber}/comments --jq '.[] | {user: .user.login, body: .body, path: .path, line: .original_line}'`,
+  `gh api repos/${REPO}/pulls/${prNumber}/comments --jq '.[] | {id: .id, user: .user.login, body: .body, path: .path, line: .original_line}'`,
 ])
 const reviews = runCommand([
-  `gh api repos/${TARGET_REPO}/pulls/${prNumber}/reviews --jq '.[] | select(.body != "") | {user: .user.login, state: .state, body: .body}'`,
+  `gh api repos/${REPO}/pulls/${prNumber}/reviews --jq '.[] | select(.body != "") | {user: .user.login, state: .state, body: .body}'`,
 ])
 
 // ─── Phase 2: カテゴリ分け・提示 ───────────────────────────
@@ -48,6 +50,10 @@ const REVIEW_ITEM_SCHEMA: Schema = {
   items: {
     type: 'object',
     properties: {
+      id: {
+        type: ['number', 'null'],
+        description: 'レビューコメント側の id。レビュー本文由来など id が無いものは null',
+      },
       file: { type: ['string', 'null'], description: '対象ファイルパス。無ければ null' },
       line: { type: ['string', 'number', 'null'], description: '対象行。無ければ null' },
       original: { type: 'string', description: '指摘の原文' },
@@ -57,13 +63,14 @@ const REVIEW_ITEM_SCHEMA: Schema = {
         description: '指摘の妥当性についての評価（妥当・要検討・的外れ等、理由も添えて）',
       },
     },
-    required: ['file', 'line', 'original', 'summary', 'validity'],
+    required: ['id', 'file', 'line', 'original', 'summary', 'validity'],
   },
 }
 
 const items = complete(
   dedent`
-    以下のレビューコメント・レビュー本文それぞれについて、原文・内容の要約・妥当性の評価を抽出してください。
+    以下のレビューコメント・レビュー本文それぞれについて、id・原文・内容の要約・妥当性の評価を抽出してください。
+    id はレビューコメント側にのみ含まれる元の id をそのまま使う（レビュー本文由来の項目は null）。
 
     レビューコメント:
     ${reviewComments}
@@ -75,6 +82,7 @@ const items = complete(
 )
 
 type ReviewItem = {
+  id: number | null
   file: string | null
   line: string | number | null
   original: string
@@ -123,6 +131,12 @@ if (mode === 2) {
 
   const targetItems = items.filter((_: ReviewItem, i: number) => !excludeNumbers.includes(i + 1))
   Skill('implement', targetItems.map(itemText).join('\n\n'))
+
+  for (const item of targetItems) {
+    if (item.id) {
+      runCommand([`gh api repos/${REPO}/pulls/comments/${item.id}/reactions -f content='+1' >/dev/null 2>&1 || true`])
+    }
+  }
 } else {
   for (let i = 0; i < items.length; i++) {
     let text = itemText(items[i], i)
@@ -130,6 +144,10 @@ if (mode === 2) {
 
     while (!proceed) {
       Skill('implement', text)
+
+      if (items[i].id) {
+        runCommand([`gh api repos/${REPO}/pulls/comments/${items[i].id}/reactions -f content='+1' >/dev/null 2>&1 || true`])
+      }
 
       if (i === items.length - 1) {
         proceed = true

@@ -2,8 +2,6 @@
 name: create-commit-msg
 description: create-commit-msg スキルを実行するエージェント。複数候補から最適な1つを選んで確定する。
 tools: "*"
-# model: sonnet
-model: haiku
 ---
 
 `Skill("create-commit-msg")` を実行してください（引数は不要です）。

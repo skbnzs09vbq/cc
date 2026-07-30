@@ -114,6 +114,12 @@ const openIssueCount =
       `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number --jq length`,
     ]),
   ) || 0
+const openPrCount =
+  Number(
+    runCommand([
+      `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number --jq length`,
+    ]),
+  ) || 0
 
 if (openIssueCount === 0 && counts['direction'] > 0) {
   respond(dedent`
@@ -125,10 +131,17 @@ if (openIssueCount === 0 && counts['direction'] > 0) {
   exit()
 }
 
+const HAS_TARGET: Record<WorkflowType, boolean> = {
+  'auto-dev': openIssueCount > 0 || openPrCount > 0,
+  'pr-review': openPrCount > 0,
+  direction: true,
+}
+
 const nextType: WorkflowType =
   openIssueCount === 0
     ? 'direction'
     : (Object.keys(TARGET_RATIO) as WorkflowType[])
+        .filter((t) => HAS_TARGET[t])
         .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
         .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
 

@@ -2,8 +2,6 @@
 name: create-branch-name
 description: create-branch-name スキルを実行するエージェント。複数候補から最適な1つを選んで確定する。
 tools: "*"
-# model: sonnet
-model: haiku
 ---
 
 与えられた引数で `Skill("create-branch-name", 引数)` を実行してください。
