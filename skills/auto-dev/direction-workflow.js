@@ -22,6 +22,10 @@ const GRANULARITY_NOTE = dedent`
   - 選んだ観点の中で見つかった課題は、できるだけ粒度を細かく分割し、複数のissue候補として提案してください
   - ただし同時に実装しないと技術的に問題がある（強い依存関係がある等）場合のみ、1つのissueにまとめてください
   - 提案するissue候補は多くても${MAX_ISSUE_COUNT}件程度にしてください
+  - 各issueに priority（high/middle/low）を付けてください。技術選定・雛形構築など他の多くのissueの前提となる「土台」issueは high、その土台issueの完了が前提となる（他issueに依存する）issueは low、それ以外（依存が無い・独立して進められる）は middle としてください
+  - 技術選定がまだ済んでいない場合は、ここで言語・フレームワーク・内部DB・ORM・マイグレーションツール等を具体的に（バージョン・ライブラリ名を含めて）1つに確定し、description に明記してください。「選定してください」のような、実装者に選定をやり直させる曖昧な指示は禁止です
+    - 既存 open issue の本文に既に技術の記載があれば、それを踏襲して一貫性を保ってください
+    - 仕様側（Notionなど）の記述と .claude/local/project.ts の LINT_COMMAND・TYPECHECK_COMMAND（実際にこの環境で検証可能な言語ツールチェイン）が食い違う場合は、検証可能な方を優先し、矛盾があった旨と判断理由を description に明記してください
 `
 
 const ITEMS_SCHEMA = {
@@ -35,8 +39,13 @@ const ITEMS_SCHEMA = {
           title: { type: 'string' },
           description: { type: 'string' },
           rationale: { type: 'string', description: 'なぜ今このissueが必要か' },
+          priority: {
+            type: 'string',
+            enum: ['high', 'middle', 'low'],
+            description: '他issueの前提となる土台issueはhigh、他issueの完了に依存するissueはlow、それ以外はmiddle',
+          },
         },
-        required: ['title', 'description', 'rationale'],
+        required: ['title', 'description', 'rationale', 'priority'],
       },
       description: '次に着手すべき issue 候補一覧（無ければ空配列）',
     },
@@ -174,6 +183,7 @@ const created = await pipeline(
       dedent`
         以下の issue 下書きから、.claude/local/project.ts の TARGET_REPO・ASSIGNEE を確認してから gh issue create を実行し、
         実際に issue を作成してください（1行目をタイトル、残りを本文として扱う）
+        タイトルの先頭に "[${item.priority}] " を付与してください（例: "[high] 内部DB..."）
         --add-assignee <ASSIGNEE> フラグで ASSIGNEE を指定して、作成と同時にアサインしてください
         本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出す等、安全な方法で実行してください
         作成した issue の URL を返してください

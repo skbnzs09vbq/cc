@@ -159,8 +159,21 @@ const DETECTED_SCHEMA: Schema = {
       type: 'array',
       items: {
         type: 'object',
-        properties: { number: { type: 'integer' }, url: { type: 'string' } },
-        required: ['number', 'url'],
+        properties: {
+          number: { type: 'integer' },
+          url: { type: 'string' },
+          title: { type: 'string' },
+          blocked: {
+            type: 'boolean',
+            description:
+              '本文の「依存関係」セクションが名指しする前提（他issueの実装・決定事項など）が、まだ open のまま未解決の場合は true。前提が無い、または前提が既に解決済み（該当issueがopen一覧に無い＝クローズ済み）の場合は false',
+          },
+          blockedReason: {
+            type: ['string', 'null'],
+            description: 'blocked が true の場合、何が前提でブロックされているかを簡潔に。false の場合は null',
+          },
+        },
+        required: ['number', 'url', 'title', 'blocked', 'blockedReason'],
       },
     },
     prs: {
@@ -191,7 +204,7 @@ function resolveAutoDevTarget(): {
   worktreePath: string
 } | null {
   const openIssues = runCommand([
-    `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title`,
+    `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title,body`,
   ])
   const allPrs = runCommand([
     `gh pr list --repo ${TARGET_REPO} --state all --json number,title,body`,
@@ -206,6 +219,9 @@ function resolveAutoDevTarget(): {
       過去に処理済みかどうかは問わず、現時点で対応が必要なものすべてが対象です。
 
       - issue: 対応する PR（issue番号を本文かタイトルに含むもの）がまだ無いもの
+        各issueの本文にある「依存関係」セクションを確認し、そこで前提とされている作業（他issueの実装・技術選定など）が
+        まだ open の別issueとして残っている（＝解決済みでない）場合は blocked:true, blockedReason に前提の内容を入れる。
+        前提が無い、または前提が既にクローズ済み（open issue一覧に見当たらない）なら blocked:false, blockedReason:null とする
       - PR: 未対応のコメント・レビュー指摘があるもの（投稿者が ${ASSIGNEE} 自身かどうかは問わない
         最新のコメント/レビュー以降に、それへ対応した追加コミットがまだ無いものを対象とする）
         branch として headRefName を含める。
@@ -225,7 +241,14 @@ function resolveAutoDevTarget(): {
 
   const inProgress = stillRunning.map((entry) => entry.target).join(' ')
   const pr = detected.prs.find((pr) => !inProgress.includes(`issue #${pr.issueNumber}`))
-  const issue = detected.issues.find((issue) => !inProgress.includes(`issue #${issue.number}`))
+
+  const PRIORITY_RANK: Record<string, number> = { high: 0, middle: 1, low: 2 }
+  const priorityOf = (title: string) => PRIORITY_RANK[title.match(/^\[(high|middle|low)\]/)?.[1] ?? 'middle']
+
+  const issue = detected.issues
+    .filter((issue) => !issue.blocked)
+    .filter((issue) => !inProgress.includes(`issue #${issue.number}`))
+    .sort((a, b) => priorityOf(a.title) - priorityOf(b.title))[0]
 
   if (pr) {
     const worktreePath = Skill(
