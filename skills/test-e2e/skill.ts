@@ -58,7 +58,7 @@ const SERVER_SCHEMA = {
   required: ['needed', 'command', 'port'],
 } as const satisfies Schema
 
-export function e2eTest(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SCHEMA> {
+export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SCHEMA> {
   const { workingDir, description } = args
   const scriptPath = `${workingDir}/.e2e_check.py`
   const screenshotDir = `${workingDir}/.e2e_screenshots`
@@ -119,7 +119,7 @@ export function e2eTest(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
 
   const output = serverCommand
     ? runCommand([
-        `cd ${workingDir} && python .claude/skills/e2e-test/scripts/with_server.py --server "${serverCommand}" --port ${port} -- python ${scriptPath}`,
+        `cd ${workingDir} && python .claude/skills/test-e2e/scripts/with_server.py --server "${serverCommand}" --port ${port} -- python ${scriptPath}`,
       ])
     : runCommand([`cd ${workingDir} && python ${scriptPath}`])
 
@@ -157,4 +157,4 @@ export function e2eTest(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
   return { clean: judged.clean, findings: judged.findings, screenshots }
 }
 
-respond(e2eTest(getArgs(ARGS_SCHEMA)))
+respond(testE2e(getArgs(ARGS_SCHEMA)))

@@ -6,13 +6,6 @@ export const meta = {
   ],
 }
 
-function dedent(strings, ...values) {
-  const bodyLines = strings.flatMap(s => s.split('\n').slice(1)).filter(l => l.trim())
-  const indent = bodyLines.length ? Math.min(...bodyLines.map(l => l.match(/^ */)[0].length)) : 0
-  const strip = s => s.split('\n').map((l, i) => i === 0 ? l : (l.startsWith(' '.repeat(indent)) ? l.slice(indent) : l)).join('\n')
-  return strings.reduce((acc, s, i) => acc + strip(s) + (i < values.length ? values[i] : ''), '').trim()
-}
-
 const E2E_SCHEMA = {
   type: 'object',
   properties: {
@@ -28,7 +21,6 @@ const E2E_SCHEMA = {
 }
 
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
-const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
 log(`PR #${pr.number} のコメント対応を開始`)
 
@@ -36,11 +28,7 @@ log(`PR #${pr.number} のコメント対応を開始`)
 phase('PR対応')
 
 const summary = await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    ${JSON.stringify({ url: pr.url, autonomous: true })}
-  `,
+  JSON.stringify({ workingDir: worktreePath, url: pr.url, autonomous: true }),
   { agentType: 'git-pr-resolve-comments', phase: 'PR対応', label: `pr #${pr.number}` }
 )
 
@@ -51,7 +39,7 @@ const e2e = await agent(
     serverCommand: null,
     port: null,
   }),
-  { agentType: 'e2e-test', schema: E2E_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} 動作確認` }
+  { agentType: 'test-e2e', schema: E2E_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} 動作確認` }
 )
 
 await agent(

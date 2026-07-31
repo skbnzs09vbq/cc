@@ -1,4 +1,5 @@
 import { TARGET_REPO } from '../../local/project.js'
+import { gitPrCommentsList } from '../git-pr-comments-list/skill.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -39,17 +40,22 @@ const REVIEW_ITEM_SCHEMA = {
 export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
+    workingDir: {
+      type: ['string', 'null'],
+      description: '対応を行う作業ディレクトリ。未指定ならカレントディレクトリ',
+    },
     url: { type: ['string', 'null'], description: '対象の GitHub PR URL。無ければ null' },
     autonomous: {
       type: 'boolean',
       description: 'workflow 等からの無人実行なら true。ユーザーが直接呼んだ場合は false',
     },
   },
-  required: ['url', 'autonomous'],
+  required: ['workingDir', 'url', 'autonomous'],
 } as const satisfies Schema
 
 export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   const { autonomous } = args
+  const workingDir = args.workingDir ?? '.'
   remember(['git commit・git push・PR 作成は絶対に行わないこと'])
 
   // ─── Phase 1: 指摘収集 ─────────────────────────────────────
@@ -59,9 +65,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
 
   const prNumber = generate(`"${input}" から PR 番号を抽出してください。`)
 
-  const reviewComments = runCommand([
-    `gh api repos/${REPO}/pulls/${prNumber}/comments --jq '.[] | {id: .id, user: .user.login, body: .body, path: .path, line: .original_line}'`,
-  ])
+  const reviewComments = gitPrCommentsList({ prNumber: Number(prNumber) })
   const reviews = runCommand([
     `gh api repos/${REPO}/pulls/${prNumber}/reviews --jq '.[] | select(.body != "") | {user: .user.login, state: .state, body: .body}'`,
   ])
@@ -128,7 +132,10 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
         } as const)
 
     addressedItems = items.filter((_, i) => !excludeNumbers.includes(i + 1))
-    Skill('implement', addressedItems.map(itemText).join('\n\n'))
+    Skill(
+      'implement',
+      JSON.stringify({ workingDir, input: addressedItems.map(itemText).join('\n\n') }),
+    )
 
     for (const item of addressedItems) {
       if (item.id)
@@ -144,7 +151,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
       let proceed = false
 
       while (!proceed) {
-        Skill('implement', text)
+        Skill('implement', JSON.stringify({ workingDir, input: text }))
 
         if (items[i].id)
           runCommand([

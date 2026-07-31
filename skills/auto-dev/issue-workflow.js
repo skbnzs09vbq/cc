@@ -64,7 +64,6 @@ const E2E_SCHEMA = {
 }
 
 const { issue, worktreePath, maxIterations } = typeof args === 'string' ? JSON.parse(args) : args
-const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
 log(`issue #${issue.number} の対応を開始`)
 
@@ -124,7 +123,7 @@ for (let i = 0; i < maxIterations; i++) {
         serverCommand: null,
         port: null,
       }),
-      { agentType: 'e2e-test', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${i + 1}` }
+      { agentType: 'test-e2e', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${i + 1}` }
     ),
   ])
   lastE2e = e2e

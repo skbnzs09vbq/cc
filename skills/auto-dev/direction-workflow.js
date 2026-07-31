@@ -63,13 +63,25 @@ const ITEMS_SCHEMA = {
   required: ['items'],
 }
 
+const SPEC_ITEMS_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '仕様に含まれる個々の要求・機能を1件ずつの項目に分解した一覧',
+    },
+  },
+  required: ['items'],
+}
+
 // ─── Phase 1: 仕様・現状把握 ─────────────────────────────
 phase('仕様・現状把握')
 
-const specResearch = await agent(
+const specItems = (await agent(
   'project-wide spec/requirements',
-  { agentType: 'research', phase: '仕様・現状把握', label: '仕様調査' }
-)
+  { agentType: 'research', schema: SPEC_ITEMS_SCHEMA, phase: '仕様・現状把握', label: '仕様調査' }
+)).items
 
 const existingIssues = await agent(
   JSON.stringify({ type: null, assigneeOnly: false }),
@@ -79,72 +91,51 @@ const existingIssues = await agent(
 // ─── Phase 2: 次のissue選定 ─────────────────────────────
 phase('次のissue選定')
 
-let implementationStatus = null
-let items = (await agent(
-  dedent`
-    以下の仕様調査結果と既存のopen issueを比較し、まだissue化されていない不足機能があれば
-    次のissue候補として提案してください（無ければ空のitems配列）
+let gaps = await agent(
+  JSON.stringify({ items: specItems, existing: existingIssues, workingDir: null, similarityLevel: 2 }),
+  { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '不足機能の判定' }
+)
 
-    ${GRANULARITY_NOTE}
-
-    仕様調査結果:
-    ${specResearch}
-
-    既存のopen issue:
-    ${existingIssues}
-  `,
-  { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: '不足機能の判定' }
-)).items
-
-if (items.length === 0) {
-  implementationStatus = await agent(
-    dedent`
-      .claude/local/project.ts の PROJECT_ROOT/GUIDELINES を確認し、プロジェクト全体の実装状況を調査してください
-      （ディレクトリ構成、主要機能ごとの実装状況、未実装/TODO/既知の問題、コード品質・設計上の問題など、
-      仕様に明記された機能に限らず、調査中に見つかった問題・技術的負債も含める）
-      調査結果をそのまま返してください
-    `,
-    { phase: '次のissue選定', label: '実装状況調査' }
+if (gaps.length === 0) {
+  gaps = await agent(
+    JSON.stringify({ items: specItems, existing: null, workingDir: null, similarityLevel: 2 }),
+    { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '実装ギャップの判定' }
   )
+}
 
+let items = []
+
+if (gaps.length > 0) {
   items = (await agent(
     dedent`
-      以下の仕様調査結果と実装状況をもとに、不足していると判断できる部分があれば
-      次のissue候補として提案してください（無ければ空のitems配列）
-      既存のopen issueと重複させないこと
+      以下の不足項目一覧をもとに、issue として整形してください
 
       ${GRANULARITY_NOTE}
 
-      仕様調査結果:
-      ${specResearch}
-
-      実装状況:
-      ${implementationStatus}
-
-      既存のopen issue:
-      ${existingIssues}
+      不足項目一覧:
+      ${JSON.stringify(gaps)}
     `,
-    { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: '実装ギャップの判定' }
+    { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: 'issue候補の整形' }
   )).items
-}
-
-if (items.length === 0) {
+} else {
   const existingPrs = await agent(
-    JSON.stringify({ assignee: null }),
+    JSON.stringify({ assignee: null, number: null, state: null }),
     { agentType: 'git-pr-list', phase: '次のissue選定', label: '既存PR確認' }
   )
 
-  items = (await agent(
-    dedent`
-      以下のopen PR一覧を確認し、問題（コンフリクト等）があれば、それを解消するためのissue候補を
-      提案してください（無ければ空のitems配列）
-      issue候補は最大${MAX_ISSUE_COUNT}件まで提案する
+  const conflictingPrs = JSON.parse(existingPrs || '[]').filter((pr) => pr.mergeable === 'CONFLICTING')
 
-      open PR一覧:
-      ${existingPrs}
-    `,
-    { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: 'PR問題の判定' }
-  )).items
+  if (conflictingPrs.length > 0) {
+    items = (await agent(
+      dedent`
+        以下のコンフリクトしているPR一覧を解消するためのissue候補を提案してください
+
+        コンフリクトしているPR一覧:
+        ${JSON.stringify(conflictingPrs)}
+      `,
+      { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: 'PR問題の判定' }
+    )).items
+  }
 }
 
 log(`次のissue候補 ${items.length} 件`)

@@ -102,7 +102,7 @@ issue-workflow.js（skill.ts が選んだ issue 1件を処理する）
 ├── 実装
 │   └── `implement` に計画を渡して worktree 内で実装
 ├── レビュー・E2E検証（最大 maxIterations 回）
-│   ├── `review-diff`（静的レビュー）と `e2e-test`（動作確認）を並列実行
+│   ├── `review-diff`（静的レビュー）と `test-e2e`（動作確認）を並列実行
 │   ├── 指摘があれば `implement` で修正 → 再検証
 │   └── 上限到達でも clean にならなければ終了
 └── commit・PR作成
@@ -115,7 +115,7 @@ issue-workflow.js（skill.ts が選んだ issue 1件を処理する）
 pr-comment-workflow.js（skill.ts が選んだ PR 1 件を処理する）
 └── PR対応
     ├── `git-pr-resolve-comments` に PR URL を渡し指摘に対応
-    ├── `e2e-test` で対応内容を動作確認
+    ├── `test-e2e` で対応内容を動作確認
     ├── `git-commit-message` でメッセージ生成
     ├── commit
     ├── push

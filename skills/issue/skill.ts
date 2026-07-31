@@ -76,7 +76,7 @@ export function issue(issueInput: string): string {
     )
 
     const e2eResult: { clean: boolean; findings: string | null } = Skill(
-      'e2e-test',
+      'test-e2e',
       JSON.stringify({
         workingDir: '.',
         description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する。`,

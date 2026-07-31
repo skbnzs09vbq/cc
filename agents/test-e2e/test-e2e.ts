@@ -1,5 +1,5 @@
-import { ARGS_SCHEMA, e2eTest } from '@skills/e2e-test/skill.js'
+import { ARGS_SCHEMA, testE2e } from '@skills/test-e2e/skill.js'
 import { getArgs } from '@skills/_shared/args.js'
 import { respond } from '@skills/_shared/complete.js'
 
-respond(e2eTest(getArgs(ARGS_SCHEMA)))
+respond(testE2e(getArgs(ARGS_SCHEMA)))
