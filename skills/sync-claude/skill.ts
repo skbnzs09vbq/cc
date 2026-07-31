@@ -9,11 +9,11 @@ const ARGS_SCHEMA = {
     path: {
       type: 'string',
       description:
-        '比較対象 project のフォルダパス（この直下の .claude と比較する。WSL・Windowsどちらの表記でもよい）',
+        '比較対象 project のフォルダパス（この直下の .claude と比較する\nWSL・Windowsどちらの表記でもよい）',
     },
     confirmed: {
       type: ['boolean', 'null'],
-      description: '取り込んでよいか。未定なら null（ユーザーに確認する）',
+      description: '取り込んでよいか\n未定なら null（ユーザーに確認する）',
     },
   },
   required: ['path', 'confirmed'],
@@ -27,7 +27,7 @@ export function syncClaude(args: Infer<typeof ARGS_SCHEMA>): string {
   phase('パスの正規化')
 
   const remoteClaudePath = generate(dedent`
-    次のパス配下の .claude ディレクトリに、現在のシェル環境から実際にアクセスできる絶対パスを確定してください。
+    次のパス配下の .claude ディレクトリに、現在のシェル環境から実際にアクセスできる絶対パスを確定してください
 
     - 今の環境が WSL か Windows(git-bash) かを uname -r 等で確認する
     - 与えられたパスの表記を、今の環境で使える形式に変換した候補をいくつか作る
@@ -125,8 +125,8 @@ export function syncClaude(args: Infer<typeof ARGS_SCHEMA>): string {
   for (const f of removed) runCommand([`rm -f ".claude/${f}"`])
 
   return dedent`
-    ${remoteClaudePath} の内容を今の .claude に取り込みました（追加${added.length}件・削除${removed.length}件・変更${modified.length}件）。
-    git status で反映内容を確認し、問題なければ verify-no-project-leak を実行してからコミットしてください。
+    ${remoteClaudePath} の内容を今の .claude に取り込みました（追加${added.length}件・削除${removed.length}件・変更${modified.length}件）
+    git status で反映内容を確認し、問題なければ verify-no-project-leak を実行してからコミットしてください
   `
 }
 

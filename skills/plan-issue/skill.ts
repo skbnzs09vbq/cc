@@ -29,7 +29,7 @@ const ISSUE_SCHEMA = {
   properties: {
     id: {
       type: ['string', 'null'],
-      description: 'Issue の識別子（チケット番号等）。入力に含まれなければ null',
+      description: 'Issue の識別子（チケット番号等）\n入力に含まれなければ null',
     },
     title: { type: 'string' },
     description: { type: 'string' },
@@ -48,7 +48,7 @@ const PR_DUPLICATE_SCHEMA = {
     prs: {
       type: ['array', 'null'],
       description:
-        'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）。false の場合は null',
+        'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）\nfalse の場合は null',
       items: { type: 'string' },
     },
   },
@@ -75,7 +75,7 @@ const APPROVAL_SCHEMA = {
     },
     feedback: {
       type: ['string', 'null'],
-      description: 'approved が false の場合、修正してほしい内容。true の場合は null',
+      description: 'approved が false の場合、修正してほしい内容\ntrue の場合は null',
     },
   },
   required: ['approved', 'feedback'],
@@ -88,7 +88,7 @@ export const ARGS_SCHEMA = {
     shouldContinue: {
       type: ['boolean', 'null'],
       description:
-        '重複しそうな PR がある場合でも計画を続けるか。未定なら null（ユーザーに確認する）',
+        '重複しそうな PR がある場合でも計画を続けるか\n未定なら null（ユーザーに確認する）',
     },
   },
   required: ['issueInput', 'shouldContinue'],
@@ -111,8 +111,8 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
   const issue = complete(
     issueInput.startsWith('http')
-      ? `"${issueInput}" 種別の読み取り専用ツールを ToolSearch で探して fetch し、Issue 情報として構造化してください。`
-      : `以下の入力を Issue 情報として解釈してください。\n\n入力: ${issueInput}`,
+      ? `"${issueInput}" 種別の読み取り専用ツールを ToolSearch で探して fetch し、Issue 情報として構造化してください`
+      : `以下の入力を Issue 情報として解釈してください\n\n\n入力: ${issueInput}`,
     ISSUE_SCHEMA,
   )
 
@@ -123,7 +123,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
   const prCheck = complete(
     buildCommandPrompt(
-      `"${issueLabel}" と実装が重複しそうな open/draft PR がないか確認してください。`,
+      `"${issueLabel}" と実装が重複しそうな open/draft PR がないか確認してください`,
       [
         `gh pr list --repo ${TARGET_REPO} --state open --json number,title,headRefName,isDraft --limit 50`,
       ],
@@ -134,13 +134,13 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
   if (prCheck.duplicate) {
     shouldContinue ??= askUser(
       dedent`
-        "${issueLabel}" と重複しそうな PR が見つかりました。
+        "${issueLabel}" と重複しそうな PR が見つかりました
         ${(prCheck.prs ?? []).join('\n')}
         このまま計画を続けますか？
       `,
       { type: 'boolean' } as const,
     )
-    if (!shouldContinue) exit('重複する PR がある可能性があるため、計画立案を中止しました。')
+    if (!shouldContinue) exit('重複する PR がある可能性があるため、計画立案を中止しました')
   }
 
   const relatedContext = Skill('research', `"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
@@ -148,7 +148,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
   const codeResult = generate(
     buildCommandPrompt(
       dedent`
-        プロジェクト ${PROJECT_ROOT} で以下 issue に関連するコードを調査してください。origin/${BASE_BRANCH} の状態を基準にする。
+        プロジェクト ${PROJECT_ROOT} で以下 issue に関連するコードを調査してください\norigin/${BASE_BRANCH} の状態を基準にする
 
         Issue: ${issue.title}
         説明: ${issue.description}
@@ -171,7 +171,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     subagent_type: 'Plan',
     description: `${issueLabel} の実装計画設計`,
     prompt: dedent`
-      以下の Issue と調査結果をもとに、実装計画を設計してください。
+      以下の Issue と調査結果をもとに、実装計画を設計してください
 
       ## Issue
       ID: ${issue.id || '(なし)'}
@@ -196,7 +196,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
   const planResult = complete(
     dedent`
-      以下の設計内容を、指定のフォーマットに整形してください。
+      以下の設計内容を、指定のフォーマットに整形してください
 
       ## 設計内容
       ${architecture}
@@ -218,14 +218,14 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
       2. ...
 
       ## 懸念点・リスク
-      {あれば記載。なければ「なし」}
+      {あれば記載\nなければ「なし」}
 
       ## PR 概要
-      - タイトル: PR_TITLE_FORMAT「${PR_TITLE_FORMAT}」のプレースホルダをすべて埋めたタイトル（type: ${TYPES.join(' / ')}。チケット番号のプレースホルダがあり ID があれば ${issue.id} を使う）
+      - タイトル: PR_TITLE_FORMAT「${PR_TITLE_FORMAT}」のプレースホルダをすべて埋めたタイトル（type: ${TYPES.join(' / ')}\nチケット番号のプレースホルダがあり ID があれば ${issue.id} を使う）
       - Assignee: ${ASSIGNEE}
 
       ## 既存作業との重複
-      {PR・タスクとの重複があれば記載。なければ省略}
+      {PR・タスクとの重複があれば記載\nなければ省略}
     `,
     PLAN_SCHEMA,
   )
@@ -233,7 +233,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
   const issueId =
     issue.id ||
     generate(
-      `"${issue.title}" から、ディレクトリ名に使える短い kebab-case のスラッグを生成してください。`,
+      `"${issue.title}" から、ディレクトリ名に使える短い kebab-case のスラッグを生成してください`,
     )
   let planContent = planResult.planContent
 
@@ -242,7 +242,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
   const isComplex = complete(
     dedent`
-      以下の実装計画が、次のいずれかに該当するか判定してください。該当しなければ false を返してください。
+      以下の実装計画が、次のいずれかに該当するか判定してください\n該当しなければ false を返してください
 
       - 複数のドメイン・レイヤーにまたがる設計変更を伴う
       - 新しいデータモデルやアーキテクチャパターンを導入する
@@ -268,7 +268,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
     const response = askUser(
       dedent`
-        計画を作成しました（${planDir}plan.md）。この内容で進めてよいですか？
+        計画を作成しました（${planDir}plan.md）\nこの内容で進めてよいですか？
 
         ${planContent}
       `,
@@ -278,7 +278,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     if (response.approved) approved = true
     else {
       planContent = complete(dedent`
-        以下のフィードバックを反映して実装計画を更新してください。
+        以下のフィードバックを反映して実装計画を更新してください
 
         実装計画:
         ${planContent}

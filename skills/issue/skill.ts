@@ -18,7 +18,7 @@ const BASE_BRANCH_SCHEMA = {
   properties: {
     baseBranch: {
       type: ['string', 'null'],
-      description: '実装計画に分岐元として明記されているブランチがあればその名前。無ければ null',
+      description: '実装計画に分岐元として明記されているブランチがあればその名前\n無ければ null',
     },
   },
   required: ['baseBranch'],
@@ -37,7 +37,7 @@ export function issue(issueInput: string): string {
   const planResult: string = Skill('plan-issue', issueInput)
 
   const plan = complete(
-    `以下の plan-issue の結果から issueId・planContent を抽出してください。\n\n${planResult}`,
+    `以下の plan-issue の結果から issueId・planContent を抽出してください\n\n\n${planResult}`,
     PLAN_RESULT_SCHEMA,
   )
 
@@ -48,7 +48,7 @@ export function issue(issueInput: string): string {
 
   const { baseBranch } = complete(
     dedent`
-      以下の実装計画に分岐元として明記されているブランチがあれば baseBranch に、なければ null を返してください。
+      以下の実装計画に分岐元として明記されているブランチがあれば baseBranch に、なければ null を返してください
 
       実装計画:
       ${plan.planContent}
@@ -79,7 +79,7 @@ export function issue(issueInput: string): string {
       'test-e2e',
       JSON.stringify({
         workingDir: '.',
-        description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する。`,
+        description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する`,
         serverCommand: null,
         port: null,
       }),

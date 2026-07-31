@@ -30,32 +30,32 @@ const ARGS_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
       description:
-        '対象の定数名一覧。update の場合は先頭の "update" を除いた残りのトークン、add の場合は全トークン',
+        '対象の定数名一覧\nupdate の場合は先頭の "update" を除いた残りのトークン、add の場合は全トークン',
     },
     addClaude: {
       type: ['boolean', 'null'],
-      description: '.gitignore に .claude を追加してよいか。未定なら null（ユーザーに確認する）',
+      description: '.gitignore に .claude を追加してよいか\n未定なら null（ユーザーに確認する）',
     },
     gitignoreCommitConfirmed: {
       type: ['boolean', 'null'],
-      description: '.gitignore をコミットしてよいか。未定なら null（ユーザーに確認する）',
+      description: '.gitignore をコミットしてよいか\n未定なら null（ユーザーに確認する）',
     },
     gitignorePushConfirmed: {
       type: ['boolean', 'null'],
-      description: '.gitignore のコミットを push してよいか。未定なら null（ユーザーに確認する）',
+      description: '.gitignore のコミットを push してよいか\n未定なら null（ユーザーに確認する）',
     },
     gitPolicy: {
       type: ['string', 'null'],
       enum: ['no-git', 'no-commit', 'normal', null],
-      description: '.claude 自身の git 管理方針。未定なら null（ユーザーに確認する）',
+      description: '.claude 自身の git 管理方針\n未定なら null（ユーザーに確認する）',
     },
     initialCommitConfirmed: {
       type: ['boolean', 'null'],
-      description: '空の初回コミットを作成してよいか。未定なら null（ユーザーに確認する）',
+      description: '空の初回コミットを作成してよいか\n未定なら null（ユーザーに確認する）',
     },
     initialCommitPushConfirmed: {
       type: ['boolean', 'null'],
-      description: '初回コミットを push してよいか。未定なら null（ユーザーに確認する）',
+      description: '初回コミットを push してよいか\n未定なら null（ユーザーに確認する）',
     },
   },
   required: [
@@ -73,7 +73,7 @@ const ARGS_SCHEMA = {
 const VALUES_SCHEMA: Schema = {
   type: 'object',
   description:
-    '対象定数名をキー、確定値を値としたオブジェクト。確認・変更が不要な定数はキーごと含めない',
+    '対象定数名をキー、確定値を値としたオブジェクト\n確認・変更が不要な定数はキーごと含めない',
 }
 
 export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
@@ -97,7 +97,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
 
   const finalValues = askUser(
     dedent`
-      以下のテンプレートと現在の設定をもとに、対象の定数の値を確認してください。
+      以下のテンプレートと現在の設定をもとに、対象の定数の値を確認してください
 
       対象: ${names.length ? names.join(', ') : mode === 'add' ? '全定数のうち未設定のもの' : '全定数'}
 
@@ -106,8 +106,8 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
       - 現在値があれば「現在値 → 変更するか」を確認する
       - テンプレートに既定値があればそれを提示し、変更したい場合のみ新しい値を聞く
       - いずれもなければ値を質問する（不明・未使用なら空欄でよい旨を伝える）
-      - 確認・質問は長文の一括箇条書きではなく、選択式 UI（1問につき2〜4択、1回につき最大4問）のダイアログで行う。
-        enum・boolean・既知候補（現在値／自動検出値／テンプレート既定値／変更する 等）がある定数は選択肢として提示する。
+      - 確認・質問は長文の一括箇条書きではなく、選択式 UI（1問につき2〜4択、1回につき最大4問）のダイアログで行う
+        enum・boolean・既知候補（現在値／自動検出値／テンプレート既定値／変更する 等）がある定数は選択肢として提示する
         URL・パスなど自由記述が必要な定数のみ、選択肢の中に「自由入力」を含めるか個別にテキストで質問する
       - 対象定数が5件を超える場合は、関連する定数ごとにまとめて複数回に分けて聞く（1回に詰め込みすぎない）
 
@@ -131,7 +131,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
       : generate(
           output
             ? dedent`
-              以下の既存内容のうち、次の値に該当する定数の宣言だけを更新してください（他の宣言はそのまま保持する）。
+              以下の既存内容のうち、次の値に該当する定数の宣言だけを更新してください（他の宣言はそのまま保持する）
 
               既存内容:
               ${output}
@@ -141,7 +141,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
             `
             : dedent`
               以下のテンプレートと同じ構造（export const 宣言・JSDoc コメント・区切りコメント）で、
-              次の値に該当する定数だけ値を置き換えて新規作成してください（それ以外はテンプレートの既定値のまま残す）。
+              次の値に該当する定数だけ値を置き換えて新規作成してください（それ以外はテンプレートの既定値のまま残す）
 
               テンプレート:
               ${template}
@@ -163,8 +163,8 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
     const autoDevTemplate = readFile(AUTO_DEV_TEMPLATE_PATH)
     const merged = rulesContent
       ? generate(dedent`
-          以下の既存内容に、次のテンプレート内容を追記してください。
-          既存内容に同じ見出し（例: "## GitHub 操作"）が既にあれば、新規見出しを作らずそのセクション内に自然に統合する。
+          以下の既存内容に、次のテンプレート内容を追記してください
+          既存内容に同じ見出し（例: "## GitHub 操作"）が既にあれば、新規見出しを作らずそのセクション内に自然に統合する
 
           既存内容:
           ${rulesContent}
@@ -264,7 +264,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
         }
       } else {
         respond(
-          `${GITIGNORE_PATH} のコミットは行いませんでした。コミットするまで .claude が worktree で ignore されない点に注意してください`,
+          `${GITIGNORE_PATH} のコミットは行いませんでした\nコミットするまで .claude が worktree で ignore されない点に注意してください`,
         )
       }
     }
@@ -365,7 +365,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
 
     if (!hasCommits) {
       initialCommitConfirmed ??= askUser(
-        'このリポジトリにはまだコミットが1つもありません。auto-dev の worktree 作成には最低1つのコミットが必要です。空の初回コミット（chore: initial empty commit）を作成してよいですか？',
+        'このリポジトリにはまだコミットが1つもありません\nauto-dev の worktree 作成には最低1つのコミットが必要です\n空の初回コミット（chore: initial empty commit）を作成してよいですか？',
         {
           type: 'object',
           properties: { confirmed: { type: 'boolean' } },
@@ -390,7 +390,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
           runCommand([`git push -u origin HEAD:${baseBranch}`])
           respond('push しました')
         } else {
-          respond('push は行いませんでした。push するまで auto-dev の worktree 作成は失敗します')
+          respond('push は行いませんでした\npush するまで auto-dev の worktree 作成は失敗します')
         }
       }
     }

@@ -22,7 +22,7 @@ import {
 } from "../issue-list/skill.js";
 
 const CRON_PROMPT =
-  "auto-dev スキルを実行してください。前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと";
+  "auto-dev スキルを実行してください\n前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと";
 const STATE_PATH = ".claude/local/running-workflows.json";
 
 type WorkflowType = "issue" | "pr-comment" | "pr-review" | "direction";
@@ -67,9 +67,9 @@ export function autoDev(): void {
     );
 
   remember([
-    "このスキルの役割は起動判定・状態管理・workflow の管理（起動先の選定）まで。issue/PR の実装内容そのものには立ち入らない",
+    "このスキルの役割は起動判定・状態管理・workflow の管理（起動先の選定）まで\nissue/PR の実装内容そのものには立ち入らない",
     "Workflow の起動は必ず本物の Workflow() 呼び出しで行う（シミュレーションしない）",
-    "既存taskIdの running/completed 確認だけで終わらせない。呼ばれるたびに必ずPhase 1から全フェーズを再実行し、空き枠と新規対象の有無を毎回判定し直すこと",
+    "既存taskIdの running/completed 確認だけで終わらせない\n呼ばれるたびに必ずPhase 1から全フェーズを再実行し、空き枠と新規対象の有無を毎回判定し直すこと",
     "起動先の選定は比率ではなく決定木（f_issue/f_pr の状態に基づく優先順位ルール）で行う",
     "他スキルの機能を使う場合、export された関数を直接 import して呼ぶ（Skill() 経由の自由文字列往復にしない）",
   ]);
@@ -77,8 +77,8 @@ export function autoDev(): void {
   const cronList = String(CronList());
   const alreadyScheduled = complete(
     dedent`
-      以下は CronList() の実行結果です。
-      prompt に "${CRON_PROMPT}" を含むジョブが既に登録されているか判断してください。
+      以下は CronList() の実行結果です
+      prompt に "${CRON_PROMPT}" を含むジョブが既に登録されているか判断してください
 
       ${cronList}
     `,

@@ -8,14 +8,14 @@ export const ARGS_SCHEMA = {
   properties: {
     type: {
       type: ['string', 'null'],
-      description: 'タスク管理ツールの種類。未指定なら project.ts の TASK_TRACKER を使う',
+      description: 'タスク管理ツールの種類\n未指定なら project.ts の TASK_TRACKER を使う',
     },
     title: { type: 'string', description: 'issue タイトル' },
     body: { type: 'string', description: 'issue 本文（Markdown）' },
     tempFilePath: {
       type: 'string',
       description:
-        '本文を書き出す一時ファイルのパス。並行実行される他の呼び出しと衝突しない一意なパスを呼び出し側で指定すること',
+        '本文を書き出す一時ファイルのパス\n並行実行される他の呼び出しと衝突しない一意なパスを呼び出し側で指定すること',
     },
   },
   required: ['type', 'title', 'body', 'tempFilePath'],

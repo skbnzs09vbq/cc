@@ -3,7 +3,7 @@ import type { Infer } from './infer.js'
 
 export function getArgs<S extends Schema>(schema: S): Infer<S> {
   return complete(
-    'args（このスキル呼び出し時に渡された引数）の内容を、指定された形に従って構造化して返してください。',
+    'args（このスキル呼び出し時に渡された引数）の内容を、指定された形に従って構造化して返してください',
     schema,
   )
 }

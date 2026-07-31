@@ -20,7 +20,7 @@ const ARGS_SCHEMA = {
     },
     branch: {
       type: ['string', 'null'],
-      description: 'チェックアウトする既存ブランチ名。新規 issue 対応でまだ無ければ null',
+      description: 'チェックアウトする既存ブランチ名\n新規 issue 対応でまだ無ければ null',
     },
   },
   required: ['issueNumber', 'branch'],
@@ -28,7 +28,9 @@ const ARGS_SCHEMA = {
 
 export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
   const { issueNumber, branch } = args
-  const worktreePath = `${WORKTREE_DIR}/${TICKET_PREFIX || 'issue'}-${issueNumber}`
+  // 絶対パスで返す: 呼び出し元（サブエージェント）の cwd が想定とずれていても
+  // worktree の場所が一意に定まるようにするため（相対パスだと cwd 汚染時に誤った場所を指しうる）
+  const worktreePath = `${PROJECT_ROOT}/${WORKTREE_DIR}/${TICKET_PREFIX || 'issue'}-${issueNumber}`
 
   const list = runCommand(['git worktree list --porcelain']) || ''
   const alreadyExists = list.includes(worktreePath)
@@ -42,12 +44,12 @@ export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
 
     runCommand([
       `mkdir -p ${worktreePath}/.claude/local`,
-      `cp -r .claude/skills ${worktreePath}/.claude/skills`,
-      `cp .claude/CLAUDE.md ${worktreePath}/.claude/CLAUDE.md`,
-      `cp .claude/local/project.ts ${worktreePath}/.claude/local/project.ts`,
-      `[ -f .claude/local/rules.md ] && cp .claude/local/rules.md ${worktreePath}/.claude/local/rules.md || true`,
-      `[ -f .claude/local/guidelines.md ] && cp .claude/local/guidelines.md ${worktreePath}/.claude/local/guidelines.md || true`,
-      `[ -f .claude/local/pr-review-patterns.md ] && cp .claude/local/pr-review-patterns.md ${worktreePath}/.claude/local/pr-review-patterns.md || true`,
+      `cp -r ${PROJECT_ROOT}/.claude/skills ${worktreePath}/.claude/skills`,
+      `cp ${PROJECT_ROOT}/.claude/CLAUDE.md ${worktreePath}/.claude/CLAUDE.md`,
+      `cp ${PROJECT_ROOT}/.claude/local/project.ts ${worktreePath}/.claude/local/project.ts`,
+      `[ -f ${PROJECT_ROOT}/.claude/local/rules.md ] && cp ${PROJECT_ROOT}/.claude/local/rules.md ${worktreePath}/.claude/local/rules.md || true`,
+      `[ -f ${PROJECT_ROOT}/.claude/local/guidelines.md ] && cp ${PROJECT_ROOT}/.claude/local/guidelines.md ${worktreePath}/.claude/local/guidelines.md || true`,
+      `[ -f ${PROJECT_ROOT}/.claude/local/pr-review-patterns.md ] && cp ${PROJECT_ROOT}/.claude/local/pr-review-patterns.md ${worktreePath}/.claude/local/pr-review-patterns.md || true`,
     ])
 
     if (WORKTREE_SETUP_COMMANDS.length > 0) {
@@ -57,18 +59,17 @@ export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
     }
 
     if (VSCODE_WORKSPACE_FILE) {
-      const absoluteWorktreePath = `${PROJECT_ROOT}/${worktreePath}`
       const workspaceContent = readFile(VSCODE_WORKSPACE_FILE)
 
       if (workspaceContent) {
         const workspace = JSON.parse(workspaceContent)
         const alreadyAdded = workspace.folders.some(
-          (folder: { path: string }) => folder.path === absoluteWorktreePath,
+          (folder: { path: string }) => folder.path === worktreePath,
         )
 
         if (!alreadyAdded) {
           workspace.folders.push({
-            path: absoluteWorktreePath,
+            path: worktreePath,
             name: `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`,
           })
           writeFile(VSCODE_WORKSPACE_FILE, JSON.stringify(workspace, null, 2))

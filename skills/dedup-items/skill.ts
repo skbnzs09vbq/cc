@@ -18,12 +18,12 @@ export const ARGS_SCHEMA = {
     },
     existing: {
       type: ['array', 'string'],
-      description: '既存の項目一覧。この中に実質的に同じ内容があれば重複として除外される',
+      description: '既存の項目一覧\nこの中に実質的に同じ内容があれば重複として除外される',
     },
     similarityLevel: {
       type: ['integer', 'null'],
       enum: [1, 2, 3, null],
-      description: `重複とみなす基準の厳しさ。未指定なら 2。1: ${SIMILARITY_CRITERIA[1]} / 2: ${SIMILARITY_CRITERIA[2]} / 3: ${SIMILARITY_CRITERIA[3]}`,
+      description: `重複とみなす基準の厳しさ\n未指定なら 2\n1: ${SIMILARITY_CRITERIA[1]} / 2: ${SIMILARITY_CRITERIA[2]} / 3: ${SIMILARITY_CRITERIA[3]}`,
     },
   },
   required: ['items', 'existing', 'similarityLevel'],
@@ -48,11 +48,11 @@ export function dedupItems(args: Infer<typeof ARGS_SCHEMA>) {
 
   const result = complete(
     dedent`
-      以下の「対象一覧」の各項目について、「既存一覧」のいずれかと重複しているか判定してください。
+      以下の「対象一覧」の各項目について、「既存一覧」のいずれかと重複しているか判定してください
 
       重複の判定基準: ${SIMILARITY_CRITERIA[level]}
 
-      重複していない（本当に新規の）項目の、対象一覧における0始まりのインデックスだけを返してください。
+      重複していない（本当に新規の）項目の、対象一覧における0始まりのインデックスだけを返してください
 
       対象一覧:
       ${JSON.stringify(items, null, 2)}

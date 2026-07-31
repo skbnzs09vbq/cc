@@ -23,7 +23,7 @@ const ALREADY_IMPLEMENTED_SCHEMA = {
     },
     summary: {
       type: ['string', 'null'],
-      description: 'implemented が true の場合、その概要。false の場合は null',
+      description: 'implemented が true の場合、その概要\nfalse の場合は null',
     },
   },
   required: ['implemented', 'summary'],
@@ -35,7 +35,7 @@ export const ARGS_SCHEMA = {
     input: { type: 'string', description: '自由記述の issue 起票内容（要望・背景等）' },
     shouldContinue: {
       type: ['boolean', 'null'],
-      description: '実装済みの可能性がある場合でも続けるか。未定なら null（ユーザーに確認する）',
+      description: '実装済みの可能性がある場合でも続けるか\n未定なら null（ユーザーに確認する）',
     },
   },
   required: ['input', 'shouldContinue'],
@@ -60,8 +60,8 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
 
   let fields = complete(
     dedent`
-      以下の入力から、ISSUE_TEMPLATE の各項目に当てはまる情報を抽出してください。
-      根拠なく推測で埋めず、判断できない項目は null にしてください。
+      以下の入力から、ISSUE_TEMPLATE の各項目に当てはまる情報を抽出してください
+      根拠なく推測で埋めず、判断できない項目は null にしてください
 
       入力:
       ${input}
@@ -76,7 +76,7 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
   phase('背景調査')
 
   const researchTopic = generate(dedent`
-    次の入力から、背景調査に使う調査テーマを抽出してください。
+    次の入力から、背景調査に使う調査テーマを抽出してください
 
     ${input}
   `)
@@ -90,7 +90,7 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
 
   const alreadyImplemented = complete(
     buildCommandPrompt(
-      `origin/${BASE_BRANCH} の最新コードを確認し、この issue で書こうとしている内容がすでに実装済みでないか確認してください。`,
+      `origin/${BASE_BRANCH} の最新コードを確認し、この issue で書こうとしている内容がすでに実装済みでないか確認してください`,
       [`git log --oneline origin/${BASE_BRANCH} -20`, `git diff origin/${BASE_BRANCH}`],
     ),
     ALREADY_IMPLEMENTED_SCHEMA,
@@ -99,20 +99,20 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
   if (alreadyImplemented.implemented) {
     shouldContinue ??= askUser(
       dedent`
-        origin/${BASE_BRANCH} を確認したところ、以下の内容はすでに実装済みの可能性があります。
+        origin/${BASE_BRANCH} を確認したところ、以下の内容はすでに実装済みの可能性があります
         ${alreadyImplemented.summary}
         このまま issue 下書きの作成を続けますか？
       `,
       { type: 'boolean' } as const,
     )
-    if (!shouldContinue) exit('既に実装済みの可能性があるため、issue 下書きの作成を中止しました。')
+    if (!shouldContinue) exit('既に実装済みの可能性があるため、issue 下書きの作成を中止しました')
   }
 
   // ─── Phase 4: 不足項目の質問 ────────────────────────────────
   phase('不足項目の質問')
 
   const missingFields = complete(
-    'fields のうち、根拠なく推測でしか埋められない項目を列挙してください。すべて確定できていれば null を返してください。',
+    'fields のうち、根拠なく推測でしか埋められない項目を列挙してください\nすべて確定できていれば null を返してください',
     { type: ['array', 'null'], items: { type: 'string' } } as const,
   )
 

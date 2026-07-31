@@ -22,10 +22,10 @@ const REVIEW_ITEM_SCHEMA = {
     properties: {
       id: {
         type: ['number', 'null'],
-        description: 'レビューコメント側の id。レビュー本文由来など id が無いものは null',
+        description: 'レビューコメント側の id\nレビュー本文由来など id が無いものは null',
       },
-      file: { type: ['string', 'null'], description: '対象ファイルパス。無ければ null' },
-      line: { type: ['string', 'number', 'null'], description: '対象行。無ければ null' },
+      file: { type: ['string', 'null'], description: '対象ファイルパス\n無ければ null' },
+      line: { type: ['string', 'number', 'null'], description: '対象行\n無ければ null' },
       original: { type: 'string', description: '指摘の原文' },
       summary: { type: 'string', description: '指摘内容の要約' },
       validity: {
@@ -42,12 +42,12 @@ export const ARGS_SCHEMA = {
   properties: {
     workingDir: {
       type: ['string', 'null'],
-      description: '対応を行う作業ディレクトリ。未指定ならカレントディレクトリ',
+      description: '対応を行う作業ディレクトリ\n未指定ならカレントディレクトリ',
     },
-    url: { type: ['string', 'null'], description: '対象の GitHub PR URL。無ければ null' },
+    url: { type: ['string', 'null'], description: '対象の GitHub PR URL\n無ければ null' },
     autonomous: {
       type: 'boolean',
-      description: 'workflow 等からの無人実行なら true。ユーザーが直接呼んだ場合は false',
+      description: 'workflow 等からの無人実行なら true\nユーザーが直接呼んだ場合は false',
     },
   },
   required: ['workingDir', 'url', 'autonomous'],
@@ -61,9 +61,9 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 1: 指摘収集 ─────────────────────────────────────
   phase('指摘収集')
 
-  const input = args.url || askUser('対象の GitHub PR URL を教えてください。')
+  const input = args.url || askUser('対象の GitHub PR URL を教えてください')
 
-  const prNumber = generate(`"${input}" から PR 番号を抽出してください。`)
+  const prNumber = generate(`"${input}" から PR 番号を抽出してください`)
 
   const reviewComments = gitPrCommentsList({ prNumber: Number(prNumber) })
   const reviews = runCommand([
@@ -75,8 +75,8 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
 
   const items = complete(
     dedent`
-      以下のレビューコメント・レビュー本文それぞれについて、id・原文・内容の要約・妥当性の評価を抽出してください。
-      id はレビューコメント側にのみ含まれる元の id をそのまま使う（レビュー本文由来の項目は null）。
+      以下のレビューコメント・レビュー本文それぞれについて、id・原文・内容の要約・妥当性の評価を抽出してください
+      id はレビューコメント側にのみ含まれる元の id をそのまま使う（レビュー本文由来の項目は null）
 
       レビューコメント:
       ${reviewComments}
@@ -125,7 +125,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   if (mode === 2) {
     const excludeNumbers = autonomous
       ? []
-      : askUser('対応しない項目の番号を教えてください（無ければ空配列で回答してください）。', {
+      : askUser('対応しない項目の番号を教えてください（無ければ空配列で回答してください）', {
           type: 'array',
           items: { type: 'number' },
           description: '除外する項目の番号一覧',
@@ -164,7 +164,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
         }
 
         const next = askUser(
-          `項目 ${i + 1} の対応が完了しました。次の項目（${i + 2}）に進みますか？（いいえの場合、この項目への追加指示を聞きます）`,
+          `項目 ${i + 1} の対応が完了しました\n次の項目（${i + 2}）に進みますか？（いいえの場合、この項目への追加指示を聞きます）`,
           { type: 'boolean' } as const,
         )
 
@@ -172,7 +172,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
           proceed = true
         } else {
           const feedback = askUser(
-            `項目 ${i + 1} について追加で対応してほしい内容を教えてください。`,
+            `項目 ${i + 1} について追加で対応してほしい内容を教えてください`,
           )
           text = `${text}\n\n追加指示:\n${feedback}`
         }
@@ -181,7 +181,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   }
 
   return dedent`
-    PR #${prNumber} の指摘 ${addressedItems.length} 件に対応しました。
+    PR #${prNumber} の指摘 ${addressedItems.length} 件に対応しました
 
     ${addressedItems.map((item) => `- ${item.summary}`).join('\n')}
   `

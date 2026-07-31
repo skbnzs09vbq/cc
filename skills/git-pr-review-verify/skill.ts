@@ -61,16 +61,16 @@ export function gitPrReviewVerify(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof
   return complete(
     dedent`
       以下は PR #${prNumber} のレビュースレッド一覧（isResolved:false のものが確認対象）と、
-      最新のコミットログです。
+      最新のコミットログです
 
       未解決の各スレッドについて、必要に応じて対象ファイルの現在の内容を確認したうえで、
-      最新のコミットで指摘に対応できているか判定してください。
+      最新のコミットで指摘に対応できているか判定してください
       - 修正が完全か（ファイル操作・ロジック・テスト等）、対応後に新しい問題が無いかも確認する
       - 対応済みと判断できたスレッドは、実際に以下の mutation を実行して resolved にしてください:
         gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<該当スレッドのid>"}) { thread { isResolved } } }'
 
-      すべてのスレッドが対応済み（または元々 resolved 済み）なら allAddressed:true としてください。
-      1件でも未対応・不十分な指摘が残っていれば allAddressed:false とし、message にその内容を記載してください。
+      すべてのスレッドが対応済み（または元々 resolved 済み）なら allAddressed:true としてください
+      1件でも未対応・不十分な指摘が残っていれば allAddressed:false とし、message にその内容を記載してください
 
       レビュースレッド一覧:
       ${threads}

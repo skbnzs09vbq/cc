@@ -22,12 +22,12 @@ export const ARGS_SCHEMA = {
   properties: {
     workDescription: {
       type: ['string', 'null'],
-      description: 'ブランチ名を決めるための作業内容。無ければユーザーに確認する',
+      description: 'ブランチ名を決めるための作業内容\n無ければユーザーに確認する',
     },
     single: {
       type: ['boolean', 'null'],
       description:
-        'true の場合、候補を1つに絞って直接返す。false または null の場合、複数の候補を提示する',
+        'true の場合、候補を1つに絞って直接返す\nfalse または null の場合、複数の候補を提示する',
     },
   },
   required: ['workDescription', 'single'],
@@ -48,8 +48,8 @@ export function gitBranchName(args: Infer<typeof ARGS_SCHEMA>): string {
     (angle) =>
       complete(
         dedent`
-          以下の作業内容から、"${angle}" の切り口でブランチ名を1つ生成してください。
-          作業内容が読み取りにくくても、"chore/add-placeholder" のような作業内容を反映しない汎用名は選ばないこと。
+          以下の作業内容から、"${angle}" の切り口でブランチ名を1つ生成してください
+          作業内容が読み取りにくくても、"chore/add-placeholder" のような作業内容を反映しない汎用名は選ばないこと
 
           ブランチ名の形式: "${BRANCH_FORMAT}"
           {type} を使う場合の選択肢: ${TYPES.join(' / ')}

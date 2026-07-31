@@ -13,7 +13,7 @@ export const ARGS_SCHEMA = {
     workingDir: { type: 'string', description: 'コンフリクト解消を行うディレクトリ' },
     baseBranch: {
       type: ['string', 'null'],
-      description: '取り込む分岐元ブランチ名。未指定なら project.ts の BASE_BRANCH',
+      description: '取り込む分岐元ブランチ名\n未指定なら project.ts の BASE_BRANCH',
     },
     force: {
       type: 'boolean',
@@ -23,15 +23,15 @@ export const ARGS_SCHEMA = {
     visualCheckUrl: {
       type: ['string', 'null'],
       description:
-        'マージ前後で視覚的デグレが無いか確認するページ。null なら視覚チェックを行わない',
+        'マージ前後で視覚的デグレが無いか確認するページ\nnull なら視覚チェックを行わない',
     },
     serverCommand: {
       type: ['string', 'null'],
-      description: '視覚チェック用の開発サーバー起動コマンド。不要なら null',
+      description: '視覚チェック用の開発サーバー起動コマンド\n不要なら null',
     },
     port: {
       type: ['integer', 'null'],
-      description: '視覚チェック用サーバーのポート番号。serverCommand がある場合は必須',
+      description: '視覚チェック用サーバーのポート番号\nserverCommand がある場合は必須',
     },
   },
   required: ['workingDir', 'baseBranch', 'force', 'visualCheckUrl', 'serverCommand', 'port'],
@@ -65,7 +65,7 @@ export function gitConflictResolve(args: Infer<typeof ARGS_SCHEMA>): Infer<typeo
   remember([
     'コンフリクト解消は、現在の実装と取り込み元（origin/baseBranch側）、どちらの機能も失わずに両立させる（片方を採用して他方を捨てない）',
     force
-      ? '諦める選択肢は無い。両立が難しくても、最も適切と判断できる形で必ず commit まで完了させること'
+      ? '諦める選択肢は無い\n両立が難しくても、最も適切と判断できる形で必ず commit まで完了させること'
       : '安全に両立できないと判断した場合のみ、無理に解消せず committed:false として理由を返すこと',
     'このステップでは git push を行わないこと（push は呼び出し元が最後にまとめて行う）',
   ])
@@ -76,10 +76,10 @@ export function gitConflictResolve(args: Infer<typeof ARGS_SCHEMA>): Infer<typeo
 
   let step = complete(
     dedent`
-      "cd ${workingDir} && git merge origin/${baseBranch}" の実行結果です。
+      "cd ${workingDir} && git merge origin/${baseBranch}" の実行結果です
       コンフリクトが無ければそのまま、あれば両立する形で解消したうえで、
-      git add・git commit（差分があれば）を実行し committed:true としてください。
-      ${force ? '' : '安全に両立できない場合のみ git merge --abort し、committed:false, message に理由を入れてください。'}
+      git add・git commit（差分があれば）を実行し committed:true としてください
+      ${force ? '' : '安全に両立できない場合のみ git merge --abort し、committed:false, message に理由を入れてください'}
 
       実行結果:
       ${mergeResult}
@@ -124,9 +124,9 @@ export function gitConflictResolve(args: Infer<typeof ARGS_SCHEMA>): Infer<typeo
 
       step = complete(
         dedent`
-          マージ後の実装で、視覚的デグレ（マージ前後で見た目が変わってはいけない箇所の差分）が検知されました。
-          現在の実装を見直し、デグレを解消するように該当ファイルを修正してください。
-          修正できたら git add・git commit を実行し、committed:true としてください（push はまだ行わない）。
+          マージ後の実装で、視覚的デグレ（マージ前後で見た目が変わってはいけない箇所の差分）が検知されました
+          現在の実装を見直し、デグレを解消するように該当ファイルを修正してください
+          修正できたら git add・git commit を実行し、committed:true としてください（push はまだ行わない）
 
           デグレ内容:
           ${check.findings}

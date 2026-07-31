@@ -33,7 +33,7 @@ export function gitPrMerge(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT
 
   return complete(
     dedent`
-      以下の gh pr merge 実行結果と、マージ後の PR 状態から判定してください。
+      以下の gh pr merge 実行結果と、マージ後の PR 状態から判定してください
 
       merge 実行結果:
       ${mergeResult}
@@ -41,9 +41,9 @@ export function gitPrMerge(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT
       PR 状態（state, mergeable）:
       ${status}
 
-      state が MERGED なら merged:true, conflict:false。
-      それ以外で mergeable が CONFLICTING なら merged:false, conflict:true。
-      それ以外なら merged:false, conflict:false とし、message に理由を入れてください。
+      state が MERGED なら merged:true, conflict:false
+      それ以外で mergeable が CONFLICTING なら merged:false, conflict:true
+      それ以外なら merged:false, conflict:false とし、message に理由を入れてください
     `,
     RESULT_SCHEMA,
   )

@@ -51,13 +51,13 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
     subagent_type: 'general-purpose',
     description: 'skill間のinput/output整合性チェック',
     prompt: dedent`
-      以下は .claude/skills 配下の全 skill.ts（関数化済み。ARGS_SCHEMA と export function の
+      以下は .claude/skills 配下の全 skill.ts（関数化済み\nARGS_SCHEMA と export function の
       返り値の型注釈が、そのskillの正しい入出力仕様）と、.claude/skills/auto-dev 配下の
       全 workflow.js（agent(prompt, {agentType, schema}) や Skill(name, args) で他の skill を
-      呼び出す実際のコード）です。
+      呼び出す実際のコード）です
 
       workflow.js 内の agent()/Skill() 呼び出し1件ずつについて、agentType/Skill名から
-      呼び出し先の skill.ts を特定し、次の不一致が無いか確認してください。
+      呼び出し先の skill.ts を特定し、次の不一致が無いか確認してください
 
       - agent() の schema オプションが、呼び出し先 skill の export function の実際の返り値の型と
         フィールド名・必須/任意・型のいずれかで一致していない
@@ -65,9 +65,9 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
         プロパティを過不足なく供給できていない（明らかに欠けている・型が違う場合のみ）
       - agentType / Skill 名が実在する skill フォルダを指していない
 
-      推測での指摘はせず、実際にコードを読み比べて明確に不一致と判断できるものだけ報告してください。
-      該当箇所ごとに、ファイル・該当行・呼び出し内容の要約・呼び出し先 skill 名・不一致の内容を書いてください。
-      不一致が無ければ「不一致なし」とだけ返してください。
+      推測での指摘はせず、実際にコードを読み比べて明確に不一致と判断できるものだけ報告してください
+      該当箇所ごとに、ファイル・該当行・呼び出し内容の要約・呼び出し先 skill 名・不一致の内容を書いてください
+      不一致が無ければ「不一致なし」とだけ返してください
 
       skill.ts 一覧:
       ${skillSources}
@@ -79,7 +79,7 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
 
   const findings = complete(
     dedent`
-      以下のレビュー結果を、指定された形式の配列に整形してください（「不一致なし」であれば空配列）。
+      以下のレビュー結果を、指定された形式の配列に整形してください（「不一致なし」であれば空配列）
 
       ${rawFindings}
     `,
@@ -94,7 +94,7 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
 
     ### tsc（直接 import 経由の呼び出し）
 
-    {tsc の結果。エラー無しならその旨}
+    {tsc の結果\nエラー無しならその旨}
 
     ### agent()/Skill() 経由の呼び出し（意味的チェック）
 
@@ -107,7 +107,7 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
 
   return complete(
     dedent`
-      以下の結果を、出力フォーマットのテンプレートに従って1つのレポートに整形してください。
+      以下の結果を、出力フォーマットのテンプレートに従って1つのレポートに整形してください
 
       tsc の結果:
       ${tscResult}

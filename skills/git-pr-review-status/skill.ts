@@ -49,10 +49,10 @@ export function gitPrReviewStatus(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof
 
   return complete(
     dedent`
-      以下は PR #${prNumber} の reviewThreads 取得結果です。
-      スレッドが1件も無ければ hasComments:false, allResolved:true としてください。
+      以下は PR #${prNumber} の reviewThreads 取得結果です
+      スレッドが1件も無ければ hasComments:false, allResolved:true としてください
       1件以上あれば hasComments:true とし、すべての isResolved が true なら allResolved:true、
-      1件でも false があれば allResolved:false としてください。
+      1件でも false があれば allResolved:false としてください
 
       ${threads}
     `,

@@ -25,10 +25,10 @@ export function grillMe(plan: string): string {
   while (!done) {
     const next = complete(
       dedent`
-        以下のプランに含まれる、依存関係のある未決定事項を検討してください。
-        コードベースを調べれば判断できる点は実際に調べて解決し、質問には含めないこと。
+        以下のプランに含まれる、依存関係のある未決定事項を検討してください
+        コードベースを調べれば判断できる点は実際に調べて解決し、質問には含めないこと
         それでも曖昧・未決定な論点が残っていれば、その中から次に確認すべき1つを選び、
-        自分なりの推奨案と理由を添えて question に入れてください。
+        自分なりの推奨案と理由を添えて question に入れてください
 
         プラン:
         ${updatedPlan}
@@ -44,7 +44,7 @@ export function grillMe(plan: string): string {
     const answer = askUser(next.question)
 
     updatedPlan = complete(dedent`
-      以下のプランに、質問への回答を反映して更新してください。
+      以下のプランに、質問への回答を反映して更新してください
 
       プラン:
       ${updatedPlan}

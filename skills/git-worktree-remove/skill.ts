@@ -20,7 +20,7 @@ export const ARGS_SCHEMA = {
     forceConfirmed: {
       type: ['boolean', 'null'],
       description:
-        '通常削除に失敗した場合、強制削除してよいか。未定なら null（ユーザーに確認する）',
+        '通常削除に失敗した場合、強制削除してよいか\n未定なら null（ユーザーに確認する）',
     },
   },
   required: ['issueNumber', 'forceConfirmed'],
@@ -46,7 +46,7 @@ export function gitWorktreeRemove(args: Infer<typeof ARGS_SCHEMA>): string {
 
   if (stillExists) {
     forceConfirmed ??= askUser(
-      `${worktreePath} には未コミットの変更または未追跡ファイルがあり、通常の削除に失敗しました。強制的に削除してよいですか？（変更内容は失われます）`,
+      `${worktreePath} には未コミットの変更または未追跡ファイルがあり、通常の削除に失敗しました\n強制的に削除してよいですか？（変更内容は失われます）`,
       {
         type: 'object',
         properties: { confirmed: { type: 'boolean' } },

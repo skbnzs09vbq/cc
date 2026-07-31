@@ -78,29 +78,41 @@ const SPEC_ITEMS_SCHEMA = {
 // ─── Phase 1: 仕様・現状把握 ─────────────────────────────
 phase('仕様・現状把握')
 
-const specItems = (await agent(
+const specSummary = await agent(
   'project-wide spec/requirements',
-  { agentType: 'research', schema: SPEC_ITEMS_SCHEMA, phase: '仕様・現状把握', label: '仕様調査' }
+  { agentType: 'research', phase: '仕様・現状把握', label: '仕様調査' }
+)
+
+const specItems = (await agent(
+  dedent`
+    以下の調査結果から、仕様に含まれる個々の要求・機能を1件ずつの項目に分解してください。
+
+    ${specSummary}
+  `,
+  { schema: SPEC_ITEMS_SCHEMA, phase: '仕様・現状把握', label: '仕様項目の抽出' }
 )).items
 
-const existingIssues = await agent(
-  JSON.stringify({ type: null, assigneeOnly: false }),
+const existingIssuesRaw = await agent(
+  JSON.stringify({ type: null, assigneeOnly: false, structured: false, withDependencies: false }),
   { agentType: 'issue-list', phase: '仕様・現状把握', label: '既存issue確認' }
 )
+const existingIssues = JSON.parse(existingIssuesRaw || '[]')
 
 // ─── Phase 2: 次のissue選定 ─────────────────────────────
 phase('次のissue選定')
 
-let gaps = await agent(
+let gapsRaw = await agent(
   JSON.stringify({ items: specItems, existing: existingIssues, workingDir: null, similarityLevel: 2 }),
   { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '不足機能の判定' }
 )
+let gaps = JSON.parse(gapsRaw || '[]')
 
 if (gaps.length === 0) {
-  gaps = await agent(
+  gapsRaw = await agent(
     JSON.stringify({ items: specItems, existing: null, workingDir: null, similarityLevel: 2 }),
     { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '実装ギャップの判定' }
   )
+  gaps = JSON.parse(gapsRaw || '[]')
 }
 
 let items = []

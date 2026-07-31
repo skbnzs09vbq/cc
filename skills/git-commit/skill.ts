@@ -7,7 +7,7 @@ export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
     workingDir: { type: 'string', description: 'commit を実行するディレクトリ' },
-    message: { type: ['string', 'null'], description: 'コミットメッセージ。未定なら null' },
+    message: { type: ['string', 'null'], description: 'コミットメッセージ\n未定なら null' },
     body: { type: ['string', 'null'], description: 'コミット本文（任意）' },
   },
   required: ['workingDir', 'message', 'body'],

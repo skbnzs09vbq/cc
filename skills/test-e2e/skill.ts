@@ -21,11 +21,11 @@ export const ARGS_SCHEMA = {
     serverCommand: {
       type: ['string', 'null'],
       description:
-        '開発サーバーの起動コマンド（例: "npm run dev"）。分からなければ null（自動判定する）',
+        '開発サーバーの起動コマンド（例: "npm run dev"）\n分からなければ null（自動判定する）',
     },
     port: {
       type: ['integer', 'null'],
-      description: 'サーバーのポート番号。serverCommand が null なら null（自動判定する）',
+      description: 'サーバーのポート番号\nserverCommand が null なら null（自動判定する）',
     },
   },
   required: ['workingDir', 'description', 'serverCommand', 'port'],
@@ -37,7 +37,7 @@ const RESULT_SCHEMA = {
     clean: { type: 'boolean', description: '問題が一切ないかどうか' },
     findings: {
       type: ['string', 'null'],
-      description: 'clean が false の場合の問題内容の要約。true の場合は null',
+      description: 'clean が false の場合の問題内容の要約\ntrue の場合は null',
     },
     screenshots: {
       type: 'array',
@@ -52,8 +52,8 @@ const SERVER_SCHEMA = {
   type: 'object',
   properties: {
     needed: { type: 'boolean', description: '開発サーバーの起動が必要か（静的HTML等は不要）' },
-    command: { type: ['string', 'null'], description: '起動コマンド。needed が false なら null' },
-    port: { type: ['integer', 'null'], description: '待ち受けポート。needed が false なら null' },
+    command: { type: ['string', 'null'], description: '起動コマンド\nneeded が false なら null' },
+    port: { type: ['integer', 'null'], description: '待ち受けポート\nneeded が false なら null' },
   },
   required: ['needed', 'command', 'port'],
 } as const satisfies Schema
@@ -71,9 +71,9 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     const packageJson = runCommand([`cat ${workingDir}/package.json 2>/dev/null || echo ""`])
     const detected = complete(
       dedent`
-        以下のディレクトリで E2E 検証を行うにあたり、開発サーバーの起動が必要か判定してください。
-        必要なら、起動コマンドとポート番号を package.json の scripts 等から特定してください。
-        既にサーバーが起動済みの可能性がある場合や静的 HTML のみの場合は needed:false としてください。
+        以下のディレクトリで E2E 検証を行うにあたり、開発サーバーの起動が必要か判定してください
+        必要なら、起動コマンドとポート番号を package.json の scripts 等から特定してください
+        既にサーバーが起動済みの可能性がある場合や静的 HTML のみの場合は needed:false としてください
 
         package.json（無ければ空）:
         ${packageJson || '(なし)'}
@@ -93,13 +93,13 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
   phase('Playwrightスクリプト作成')
 
   const script = generate(dedent`
-    以下の内容を検証する、Python の Playwright スクリプト（sync API）を1本書いてください。
+    以下の内容を検証する、Python の Playwright スクリプト（sync API）を1本書いてください
 
     検証内容:
     ${description}
 
     要件:
-    - 対象が静的 HTML なら file:// URL を直接開く。動的 Web アプリなら
+    - 対象が静的 HTML なら file:// URL を直接開く\n動的 Web アプリなら
       http://localhost:${port ?? '<port>'} を開き、page.wait_for_load_state('networkidle') を
       DOM調査・操作の前に必ず待つこと
     - まずスクリーンショットや page.content() 等で現在の状態を確認してからセレクタを特定し、
@@ -134,7 +134,7 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
 
   const judged = complete(
     dedent`
-      以下は E2E 検証スクリプトの実行結果です。検証内容と照らして問題が無いか判定してください。
+      以下は E2E 検証スクリプトの実行結果です\n検証内容と照らして問題が無いか判定してください
 
       検証内容:
       ${description}

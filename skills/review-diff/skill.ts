@@ -61,7 +61,7 @@ const CHECK_RESULT_SCHEMA = {
     findings: {
       type: ['string', 'null'],
       description:
-        'clean が false の場合、出力フォーマットに従って整形した指摘内容。true の場合は null',
+        'clean が false の場合、出力フォーマットに従って整形した指摘内容\ntrue の場合は null',
     },
   },
   required: ['clean', 'findings'],
@@ -82,7 +82,7 @@ function updatePatterns(workingDir: string): string {
 
   const allComments = complete(
     dedent`
-      以下の PR 一覧に含まれる各 PR について、次の2コマンドを実行してコメント・レビューを収集してください。
+      以下の PR 一覧に含まれる各 PR について、次の2コマンドを実行してコメント・レビューを収集してください
 
         gh api repos/${REPO}/pulls/<number>/comments
         gh api repos/${REPO}/pulls/<number>/reviews
@@ -90,7 +90,7 @@ function updatePatterns(workingDir: string): string {
       PR 一覧:
       ${prList}
 
-      収集した全コメント・レビューを、どの PR・どのコメントかが分かる形でまとめて返してください。
+      収集した全コメント・レビューを、どの PR・どのコメントかが分かる形でまとめて返してください
     `,
   )
 
@@ -99,7 +99,7 @@ function updatePatterns(workingDir: string): string {
 
   const classified = complete(
     dedent`
-      以下のコメント・レビューを投稿者の種別で分類してください。
+      以下のコメント・レビューを投稿者の種別で分類してください
 
       - AI レビュー: ユーザー名が "[bot]" で終わる自動レビューツールの投稿
       - ヒューマンレビュー: それ以外の投稿者
@@ -119,11 +119,11 @@ function updatePatterns(workingDir: string): string {
 
   const updatedPatterns = complete(
     dedent`
-      既存のパターン集と、分類済みの PR コメント・レビューを照合し、パターン集を更新してください。
-      構造（AI / ヒューマン の2大セクション → カテゴリ番号・見出し形式）は維持してください。
+      既存のパターン集と、分類済みの PR コメント・レビューを照合し、パターン集を更新してください
+      構造（AI / ヒューマン の2大セクション → カテゴリ番号・見出し形式）は維持してください
 
       - 既存カテゴリに追加すべき新しい具体例があれば、既存カテゴリに追記する
-      - 新規カテゴリとして追加すべき指摘があれば、新カテゴリを追加する。
+      - 新規カテゴリとして追加すべき指摘があれば、新カテゴリを追加する
         ただし1件しか確認されていない指摘は昇格させず、2件以上確認された、または重要度 HIGH/CRITICAL の場合のみ追加する
       - 過去のパターンで現在は修正済み・廃止された観点があれば、削除またはコメントアウトする
       - ファイル冒頭の「最終更新」日付を今日の日付と対象 PR 範囲（例: #12-#48）に更新する
@@ -137,7 +137,7 @@ function updatePatterns(workingDir: string): string {
       ヒューマンレビューのコメント:
       ${JSON.stringify(classified.humanReview)}
 
-      更新後の ${PR_PATTERNS} の全文を返してください。
+      更新後の ${PR_PATTERNS} の全文を返してください
     `,
   )
 
@@ -148,7 +148,7 @@ function updatePatterns(workingDir: string): string {
 
   return complete(
     dedent`
-      以下の更新前後のパターン集の差分を、追加・変更・削除に分けて要約してください。
+      以下の更新前後のパターン集の差分を、追加・変更・削除に分けて要約してください
 
       更新前:
       ${currentPatterns || '(なし)'}
@@ -251,9 +251,9 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
         prompt: dedent`
       作業ディレクトリ: ${workingDir}
 
-      以下の差分を PR レビューパターン集の各カテゴリと照合してください。
-      推測で指摘せず、明確に該当するコードがある場合のみ報告してください（該当箇所・カテゴリ番号-項目番号・問題点・修正案を1件ずつ）。
-      該当がなければ「該当なし」とだけ返してください。
+      以下の差分を PR レビューパターン集の各カテゴリと照合してください
+      推測で指摘せず、明確に該当するコードがある場合のみ報告してください（該当箇所・カテゴリ番号-項目番号・問題点・修正案を1件ずつ）
+      該当がなければ「該当なし」とだけ返してください
 
       パターン集:
       ${prPatterns}
@@ -271,9 +271,9 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
         prompt: dedent`
       作業ディレクトリ: ${workingDir}
 
-      以下の差分を実装指針（guidelines.md）の各指針と照合してください。
-      パターン集・指針に記載のない汎用的な指摘（一般的な型エラー・スタイル等）は行わないでください（該当箇所・指針タイトル・問題点・修正案を1件ずつ）。
-      該当がなければ「該当なし」とだけ返してください。
+      以下の差分を実装指針（guidelines.md）の各指針と照合してください
+      パターン集・指針に記載のない汎用的な指摘（一般的な型エラー・スタイル等）は行わないでください（該当箇所・指針タイトル・問題点・修正案を1件ずつ）
+      該当がなければ「該当なし」とだけ返してください
 
       指針:
       ${guidelines}
@@ -294,7 +294,7 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
       作業ディレクトリ: ${workingDir}
 
       code-review スキルの指示に従い、現在の差分（変更ファイル一覧 ${filesArg} にスコープを限定する）を
-      正確性のバグ・再利用性/簡潔化/効率化の観点でレビューし、結果を報告してください。
+      正確性のバグ・再利用性/簡潔化/効率化の観点でレビューし、結果を報告してください
     `,
   })
 
@@ -310,10 +310,10 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
 
   return complete(
     dedent`
-      以下の各チェック結果を判定してください。
+      以下の各チェック結果を判定してください
       該当する問題を1件でも発見したら clean:false とし、findings に出力フォーマットのテンプレートに従って
-      整形した指摘内容（パターン違反・指針違反・code-review 指摘を1件ずつ）を入れてください。
-      問題がゼロなら clean:true, findings:null としてください。
+      整形した指摘内容（パターン違反・指針違反・code-review 指摘を1件ずつ）を入れてください
+      問題がゼロなら clean:true, findings:null としてください
 
       lint エラー: ${lintResult || 'なし'}
 

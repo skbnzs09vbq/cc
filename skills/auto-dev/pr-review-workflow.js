@@ -87,18 +87,6 @@ const STRUCTURED_FINDINGS_SCHEMA = {
   required: ['findings'],
 }
 
-const DEDUP_FINDINGS_SCHEMA = {
-  type: 'object',
-  properties: {
-    items: {
-      type: 'array',
-      items: FINDING_ITEM_SCHEMA,
-      description: 'items のうち、existing のどれとも重複しない新規の指摘のみ',
-    },
-  },
-  required: ['items'],
-}
-
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 
 async function mergeAndVerify(pr) {
@@ -205,19 +193,19 @@ if (!codeReview.clean) {
 
   const newFindings = await agent(
     JSON.stringify({ items: structured.findings, existing: existingComments, similarityLevel: null }),
-    { agentType: 'dedup-items', schema: DEDUP_FINDINGS_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出` }
-  )
+    { agentType: 'dedup-items', phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出` }
+  ).then(r => JSON.parse(r || '[]'))
 
-  newFindingsCount = newFindings.items.length
+  newFindingsCount = newFindings.length
 
   if (newFindingsCount > 0) {
     postResult = await agent(
-      JSON.stringify({ workingDir: worktreePath, prNumber: pr.number, findings: newFindings.items }),
+      JSON.stringify({ workingDir: worktreePath, prNumber: pr.number, findings: newFindings }),
       { agentType: 'git-pr-review-post', phase: 'コードレビュー', label: `pr #${pr.number} インラインコメント投稿` }
     )
 
     if (!postResult) {
-      const fallbackBody = newFindings.items
+      const fallbackBody = newFindings
         .map(f => `**${f.path}:${f.line} — ${f.title}**\n\n${f.body}`)
         .join('\n\n---\n\n')
       postResult = await agent(

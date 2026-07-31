@@ -9,7 +9,7 @@ export const ARGS_SCHEMA = {
   properties: {
     type: {
       type: ['string', 'null'],
-      description: 'タスク管理ツールの種類。未指定なら project.ts の TASK_TRACKER を使う',
+      description: 'タスク管理ツールの種類\n未指定なら project.ts の TASK_TRACKER を使う',
     },
     assigneeOnly: {
       type: 'boolean',
@@ -63,7 +63,7 @@ const DEPENDENCIES_SCHEMA = {
             type: 'array',
             items: { type: 'integer' },
             description:
-              '本文の「依存関係」セクションが前提とする他issueのうち、同じ一覧の中に実在するものの番号一覧。前提が無い、または前提issueが一覧に見当たらない（＝解決済み）場合は空配列',
+              '本文の「依存関係」セクションが前提とする他issueのうち、同じ一覧の中に実在するものの番号一覧\n前提が無い、または前提issueが一覧に見当たらない（＝解決済み）場合は空配列',
           },
         },
         required: ['number', 'dependsOnOpenIssues'],
@@ -102,7 +102,7 @@ export function issueList(
       const deps = complete(
         dedent`
           以下の issue それぞれについて、本文の「依存関係」セクションが前提とする他issueが
-          この一覧の中に実在すれば、その番号を dependsOnOpenIssues に含めてください。
+          この一覧の中に実在すれば、その番号を dependsOnOpenIssues に含めてください
 
           ${JSON.stringify(issues)}
         `,

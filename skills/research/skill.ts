@@ -7,10 +7,10 @@ const OUTPUT_FORMAT = dedent`
   ## 調査テーマ: {テーマ}
 
   ### {ソース1のタイトル}
-  {関連情報の要点。Slack の場合は日時・投稿者も記載。なければ「関連情報なし」}
+  {関連情報の要点\nSlack の場合は日時・投稿者も記載\nなければ「関連情報なし」}
 
   ### {ソース2のタイトル}
-  {関連情報の要点。なければ「関連情報なし」}
+  {関連情報の要点\nなければ「関連情報なし」}
 
   ### まとめ
   {全ソースを横断して分かったこと・未解決の点を簡潔にまとめる}
@@ -26,7 +26,7 @@ const FINDING_SCHEMA = {
       label: { type: ['string', 'null'] },
       result: {
         type: ['string', 'null'],
-        description: '検索・取得結果。対応するツールが見つからない・取得できない場合は null',
+        description: '検索・取得結果\n対応するツールが見つからない・取得できない場合は null',
       },
     },
     required: ['type', 'value', 'label', 'result'],
@@ -35,7 +35,7 @@ const FINDING_SCHEMA = {
 
 export function research(topic: string): string {
   remember([
-    '書き込み・投稿・編集は一切行わず、読み取りのみ行うこと。write 系 MCP ツールは使用禁止',
+    '書き込み・投稿・編集は一切行わず、読み取りのみ行うこと\nwrite 系 MCP ツールは使用禁止',
     'row.type に対応する MCP ツールが接続されていない・見つからない場合は、その旨を result に含めて次のソースに進む（調査全体を中断しない）',
   ])
 
@@ -45,9 +45,9 @@ export function research(topic: string): string {
   const findings = complete(
     dedent`
       以下の各ソースについて、type に対応する読み取り専用の MCP ツールを ToolSearch で探し、
-      value を対象に "${topic}" に関連する内容を検索・取得してください。
+      value を対象に "${topic}" に関連する内容を検索・取得してください
       取得結果の内容が不十分で、詳細を確認すべき参照（スレッド・ページ・Issue の URL や ID など）が
-      見つかる場合は、その参照について改めてツールを呼び出し、詳細を取得してください。
+      見つかる場合は、その参照について改めてツールを呼び出し、詳細を取得してください
 
       ソース一覧:
       ${JSON.stringify(RESEARCH_SOURCES)}
@@ -60,16 +60,16 @@ export function research(topic: string): string {
 
   return generate(
     dedent`
-      以下の調査結果を、ソース別サマリー形式に整形してください。
+      以下の調査結果を、ソース別サマリー形式に整形してください
 
       調査テーマ: ${topic}
 
       ソース別結果:
       ${JSON.stringify(findings)}
 
-      RESEARCH_SOURCES の各行に対してセクションを1つ出力する。セクションタイトルは
-      "### <種別> <値の説明>" とする（label があれば使う）。最後に全ソースを横断した
-      "### まとめ" セクションを追加する。
+      RESEARCH_SOURCES の各行に対してセクションを1つ出力する\nセクションタイトルは
+      "### <種別> <値の説明>" とする（label があれば使う）\n最後に全ソースを横断した
+      "### まとめ" セクションを追加する
 
       出力フォーマット:
       ${OUTPUT_FORMAT}
@@ -80,5 +80,5 @@ export function research(topic: string): string {
 // ─── Phase 0: テーマ確認 ─────────────────────────────────────
 phase('テーマ確認')
 
-const topic = parseArgs() || askUser('調査テーマを教えてください。')
+const topic = parseArgs() || askUser('調査テーマを教えてください')
 respond(research(topic))

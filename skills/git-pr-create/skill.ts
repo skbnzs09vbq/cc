@@ -1,8 +1,11 @@
-import { BASE_BRANCH } from '../../local/project.js'
+import { BASE_BRANCH, TARGET_REPO } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
+
+const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
+const [OWNER, NAME] = REPO.split('/')
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -11,19 +14,19 @@ export const ARGS_SCHEMA = {
     head: { type: 'string', description: 'PR の head ブランチ名' },
     base: {
       type: ['string', 'null'],
-      description: '分岐元ブランチ名。未指定なら null（BASE_BRANCH を使う）',
+      description: '分岐元ブランチ名\n未指定なら null（BASE_BRANCH を使う）',
     },
     title: {
       type: ['string', 'null'],
-      description: 'PR タイトル。未定なら null（workDescription から git-pr-draft で決定する）',
+      description: 'PR タイトル\n未定なら null（workDescription から git-pr-draft で決定する）',
     },
     description: {
       type: ['string', 'null'],
-      description: 'PR 本文の Description 部分。title と同様に未定なら null',
+      description: 'PR 本文の Description 部分\ntitle と同様に未定なら null',
     },
     closesIssue: {
       type: ['integer', 'null'],
-      description: 'この PR が close する issue 番号。あれば本文冒頭に "Closes #N" を付ける',
+      description: 'この PR が close する issue 番号\nあれば本文冒頭に "Closes #N" を付ける',
     },
     workDescription: {
       type: ['string', 'null'],
@@ -32,7 +35,7 @@ export const ARGS_SCHEMA = {
     additionalBody: {
       type: ['string', 'null'],
       description:
-        '本文末尾に追記する内容（既知の指摘など。スクリーンショットは screenshots で渡す）',
+        '本文末尾に追記する内容（既知の指摘など\nスクリーンショットは screenshots で渡す）',
     },
     screenshots: {
       type: ['array', 'null'],
@@ -62,7 +65,7 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
     const draft = Skill('git-pr-draft', workDescription)
     const picked = complete(
       dedent`
-        以下は PR タイトル・description の下書きです。この内容をそのまま採用してください
+        以下は PR タイトル・description の下書きです\nこの内容をそのまま採用してください
 
         ${draft}
       `,
@@ -86,13 +89,13 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
         ## スクリーンショット
         ${screenshots
           .map((path) => {
-            const url = runCommand([
-              `gh gist create ${path} --filename '${path.split('/').pop()}' -q`,
-            ])
-            const rawUrl = runCommand([
-              `gh api gists/${url?.split('/').pop()} -q '.files[].raw_url'`,
-            ])
-            return `![${path.split('/').pop()}](${rawUrl})`
+            const normalized = path.replace(/\\/g, '/')
+            const workingDirNormalized = workingDir.replace(/\\/g, '/')
+            const relPath = normalized.startsWith(workingDirNormalized)
+              ? normalized.slice(workingDirNormalized.length).replace(/^\//, '')
+              : normalized.split('/').pop()!
+            const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${NAME}/${args.head}/${relPath}`
+            return `![${normalized.split('/').pop()}](${rawUrl})`
           })
           .join('\n')}
       `

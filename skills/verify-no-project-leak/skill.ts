@@ -43,12 +43,12 @@ export function verifyNoProjectLeak(): string {
 
   const result = complete(
     dedent`
-      以下は project.example.ts・CLAUDE.md・agents/・skills/ 配下の全ファイル内容です。
+      以下は project.example.ts・CLAUDE.md・agents/・skills/ 配下の全ファイル内容です
       これらは本来「どのプロジェクトでも使い回せる汎用テンプレート」であるべきファイルです
-      （project 固有の実値は .claude/local/ 配下にのみ置く規約になっています）。
+      （project 固有の実値は .claude/local/ 配下にのみ置く規約になっています）
 
       次のようなものが紛れ込んでいないか確認してください:
-      - 特定プロジェクトの実際の値（実在するリポジトリURL・アカウント名・チケット接頭辞等。
+      - 特定プロジェクトの実際の値（実在するリポジトリURL・アカウント名・チケット接頭辞等
         "<org>/<repo>" のようなプレースホルダは問題なし）
       - APIキー・トークン・パスワード等の秘密情報
 
@@ -65,12 +65,12 @@ export function verifyNoProjectLeak(): string {
       STATE_PATH,
       JSON.stringify({ verifiedChecksum: checksum, verifiedAt: new Date().toISOString() }, null, 2),
     )
-    return 'project固有の情報は見つかりませんでした。検証済みとして記録しました。コミットして問題ありません。'
+    return 'project固有の情報は見つかりませんでした\n検証済みとして記録しました\nコミットして問題ありません'
   }
 
   return dedent`
-    以下の箇所に project 固有の実値・秘密情報の疑いがあります。
-    修正してから再度このスキルを実行してください（検証済みになるまでコミットはブロックされます）。
+    以下の箇所に project 固有の実値・秘密情報の疑いがあります
+    修正してから再度このスキルを実行してください（検証済みになるまでコミットはブロックされます）
 
     ${result.findings.map((f) => `- ${f.file}: ${f.reason}`).join('\n')}
   `

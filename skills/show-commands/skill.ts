@@ -13,7 +13,7 @@ export function showCommands(input: string): string {
 
     const alreadyExists = complete(
       dedent`
-        以下の既存内容に、次のコマンドと同じ内容がすでに含まれているか判定してください。
+        以下の既存内容に、次のコマンドと同じ内容がすでに含まれているか判定してください
 
         既存内容:
         ${existing || '(なし)'}
@@ -31,10 +31,10 @@ export function showCommands(input: string): string {
 
     const updated = complete(
       dedent`
-        既存の commands.md に、以下のコマンドを違和感なく追記してください。
+        既存の commands.md に、以下のコマンドを違和感なく追記してください
 
         既存内容:
-        ${existing || '(なし。新規作成する)'}
+        ${existing || '(なし\n新規作成する)'}
 
         追記するコマンド:
         ${input}
@@ -44,13 +44,13 @@ export function showCommands(input: string): string {
     writeFile(COMMANDS_PATH, updated)
 
     return dedent`
-      ${COMMANDS_PATH} に追記しました。
+      ${COMMANDS_PATH} に追記しました
 
       ${input}
     `
   }
 
-  remember(['commands.md の内容をそのまま出力すること。要約・説明・補足を一切加えない'])
+  remember(['commands.md の内容をそのまま出力すること\n要約・説明・補足を一切加えない'])
 
   // ─── Phase 1: commands.md の読み込み ─────────────────────────
   phase('commands.md の読み込み')
@@ -60,7 +60,7 @@ export function showCommands(input: string): string {
   // ─── Phase 2: 出力 ────────────────────────────────────────────
   phase('出力')
 
-  if (commandsContent === null) exit(`${COMMANDS_PATH} が見つかりませんでした。`)
+  if (commandsContent === null) exit(`${COMMANDS_PATH} が見つかりませんでした`)
 
   return commandsContent
 }

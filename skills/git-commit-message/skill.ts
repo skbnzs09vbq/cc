@@ -39,7 +39,7 @@ export function gitCommitMessage(): string {
   const candidates = ANGLES.map((angle) =>
     complete(
       dedent`
-      以下の差分から、"${angle}" の切り口でコミットメッセージ候補を1つ生成してください。
+      以下の差分から、"${angle}" の切り口でコミットメッセージ候補を1つ生成してください
 
       コミットメッセージの形式: "${COMMIT_FORMAT}"
       {type} を使う場合の選択肢: ${TYPES.join(' / ')}
@@ -49,7 +49,7 @@ export function gitCommitMessage(): string {
       差分:
       ${diff}
 
-      説明文は ${COMMIT_LANG} で簡潔に。body は${COMMIT_ALLOW_BODY ? '含めてよい' : '含めない'}。
+      説明文は ${COMMIT_LANG} で簡潔に\nbody は${COMMIT_ALLOW_BODY ? '含めてよい' : '含めない'}
     `,
       CANDIDATE_SCHEMA,
     ),

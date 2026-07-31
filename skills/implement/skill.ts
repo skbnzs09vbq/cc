@@ -18,7 +18,7 @@ const SUMMARY_SCHEMA = {
     items: {
       type: 'array',
       items: { type: 'string' },
-      description: '実装で対応した内容の箇条書き。抜け漏れなくすべて列挙する',
+      description: '実装で対応した内容の箇条書き\n抜け漏れなくすべて列挙する',
     },
   },
   required: ['items'],
@@ -29,7 +29,7 @@ export const ARGS_SCHEMA = {
   properties: {
     workingDir: {
       type: ['string', 'null'],
-      description: '実装を行う作業ディレクトリ。未指定ならカレントディレクトリ',
+      description: '実装を行う作業ディレクトリ\n未指定ならカレントディレクトリ',
     },
     input: {
       type: 'string',
@@ -99,7 +99,7 @@ export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
 
   const includesTests = complete(
     dedent`
-      以下の実装内容にテストの実装が含まれるか判定してください。
+      以下の実装内容にテストの実装が含まれるか判定してください
 
       実装内容:
       ${content}
@@ -116,7 +116,7 @@ export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
   complete(dedent`
     作業ディレクトリ: ${workingDir}（Edit/Write/Bash 等の実際のツールでの変更はすべてこのディレクトリ内で行ってください）
 
-    以下の内容をもとに実装してください。
+    以下の内容をもとに実装してください
 
     content:
     ${content}
@@ -124,7 +124,7 @@ export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
     ${testPolicy ? `testPolicy:\n${testPolicy}` : ''}
   `)
 
-  const result = complete('実装で対応した内容をすべて箇条書きで列挙してください。', SUMMARY_SCHEMA)
+  const result = complete('実装で対応した内容をすべて箇条書きで列挙してください', SUMMARY_SCHEMA)
 
   return dedent`
     ## 実装完了

@@ -43,7 +43,7 @@ export function gitPrDraft(supplement: string): string {
 
   const type = complete(
     dedent`
-      以下の変更内容から、この PR の種別を選んでください。
+      以下の変更内容から、この PR の種別を選んでください
 
       コミットログ:
       ${log}
@@ -61,7 +61,7 @@ export function gitPrDraft(supplement: string): string {
 
   const pr = complete(
     dedent`
-      以下の情報から PR タイトルと description を生成してください。
+      以下の情報から PR タイトルと description を生成してください
 
       ## タイトル
       形式: "${PR_TITLE_FORMAT}"
@@ -71,7 +71,7 @@ export function gitPrDraft(supplement: string): string {
       - 概要: ${PR_LANG} で簡潔に、「何を」「どうした」かが diff から分かるように書く
 
       ## description
-      以下のテンプレートのセクション構成・HTML コメントを削除せず、内容だけを埋めて出力してください。
+      以下のテンプレートのセクション構成・HTML コメントを削除せず、内容だけを埋めて出力してください
       テンプレート:
       ${template || '(テンプレートが取得できなかった場合は一般的な PR description 構成で生成する)'}
 
@@ -82,7 +82,7 @@ export function gitPrDraft(supplement: string): string {
       差分概要:
       ${diffStat}
 
-      ${supplement ? `引数（issue 情報や補足。diff との整合性を確認した上で反映する）:\n${supplement}` : ''}
+      ${supplement ? `引数（issue 情報や補足\ndiff との整合性を確認した上で反映する）:\n${supplement}` : ''}
     `,
     PR_SCHEMA,
   )

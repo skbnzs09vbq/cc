@@ -10,21 +10,21 @@ export const ARGS_SCHEMA = {
     workingDir: { type: 'string', description: 'gitリポジトリのディレクトリ' },
     refA: {
       type: ['string', 'null'],
-      description: '比較対象1（コミットハッシュ・ブランチ名等）。null なら project.ts の BASE_BRANCH',
+      description: '比較対象1（コミットハッシュ・ブランチ名等）\nnull なら project.ts の BASE_BRANCH',
     },
     refB: { type: 'string', description: '比較対象2（コミットハッシュ・ブランチ名等）' },
     url: {
       type: 'string',
       description:
-        '確認するページ。動的アプリは host:port を除いたパス（例: "/settings"）、静的HTMLはリポジトリルートからの相対ファイルパス',
+        '確認するページ\n動的アプリは host:port を除いたパス（例: "/settings"）、静的HTMLはリポジトリルートからの相対ファイルパス',
     },
     serverCommand: {
       type: ['string', 'null'],
-      description: '開発サーバー起動コマンド（例: "npm run dev"）。不要（静的HTML等）なら null',
+      description: '開発サーバー起動コマンド（例: "npm run dev"）\n不要（静的HTML等）なら null',
     },
     port: {
       type: ['integer', 'null'],
-      description: 'サーバーのポート番号。serverCommand がある場合は必須',
+      description: 'サーバーのポート番号\nserverCommand がある場合は必須',
     },
     expectDiff: {
       type: 'boolean',
@@ -33,7 +33,7 @@ export const ARGS_SCHEMA = {
     expectedArea: {
       type: ['string', 'null'],
       description:
-        '差分が出ることを期待する画面上の箇所の説明（例: "右上の通知アイコン周辺"）。expectDiff が true の場合のみ使う。null なら差分の有無だけ判定し、箇所までは判定しない',
+        '差分が出ることを期待する画面上の箇所の説明（例: "右上の通知アイコン周辺"）\nexpectDiff が true の場合のみ使う\nnull なら差分の有無だけ判定し、箇所までは判定しない',
     },
   },
   required: ['workingDir', 'refA', 'refB', 'url', 'serverCommand', 'port', 'expectDiff', 'expectedArea'],
@@ -46,7 +46,7 @@ const RESULT_SCHEMA = {
     hasDiff: { type: 'boolean', description: '実際に視覚的な差分があったか' },
     findings: {
       type: ['string', 'null'],
-      description: '期待と異なる場合の具体的な内容（例: 想定外の箇所に差分がある）。一致していれば null',
+      description: '期待と異なる場合の具体的な内容（例: 想定外の箇所に差分がある）\n一致していれば null',
     },
     screenshots: {
       type: 'object',
@@ -114,7 +114,7 @@ export function testVisualDiff(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RE
   const judged = complete(
     dedent`
       ${beforePath}（${refA}時点）・${afterPath}（${refB}時点）・${diffPath}（差分オーバーレイ、赤い箇所が変化点）・
-      ${sideBySidePath}（左右比較）の4枚の画像を実際に確認し、差分の有無・箇所を判定してください。
+      ${sideBySidePath}（左右比較）の4枚の画像を実際に確認し、差分の有無・箇所を判定してください
 
       compare.py の出力（機械的な差分検出結果の参考値）:
       ${compareOutput || '(出力なし)'}
@@ -123,8 +123,8 @@ export function testVisualDiff(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RE
       - 差分が出ることを${expectDiff ? '期待する' : '期待しない（出てはいけない）'}
       ${expectDiff && expectedArea ? `- 差分が出るべき箇所: ${expectedArea}（それ以外の箇所に差分があれば想定外＝デグレの疑い）` : ''}
 
-      matchesExpectation は、実際の差分（の有無・箇所）が上記の期待と一致していれば true。
-      一致しなければ false とし、findings に具体的にどう違ったかを書いてください。
+      matchesExpectation は、実際の差分（の有無・箇所）が上記の期待と一致していれば true
+      一致しなければ false とし、findings に具体的にどう違ったかを書いてください
     `,
     {
       type: 'object',
