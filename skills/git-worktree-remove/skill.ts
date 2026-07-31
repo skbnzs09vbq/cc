@@ -13,7 +13,7 @@ import type { Infer } from '../_shared/infer.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
-const ARGS_SCHEMA = {
+export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
     issueNumber: { type: 'integer', description: '削除する worktree のキーとなる issue 番号' },

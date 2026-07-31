@@ -1,40 +1,88 @@
-import { TARGET_REPO } from '../../local/project.js'
-import { getArgs } from '../_shared/args.js'
-import { type Schema, respond, runCommand } from '../_shared/complete.js'
-import type { Infer } from '../_shared/infer.js'
+import { TARGET_REPO } from "../../local/project.js";
+import { getArgs } from "../_shared/args.js";
+import { type Schema, respond, runCommand } from "../_shared/complete.js";
+import type { Infer } from "../_shared/infer.js";
 
 export const ARGS_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
     assignee: {
-      type: ['string', 'null'],
-      description: 'この GitHub アカウントが作成した PR のみに絞る。未指定なら全体',
+      type: ["string", "null"],
+      description:
+        "この GitHub アカウントが作成した PR のみに絞る。未指定なら全体",
     },
     number: {
-      type: ['integer', 'null'],
-      description: '指定した場合、この PR 番号1件だけを取得する（assignee・state は無視）',
+      type: ["integer", "null"],
+      description:
+        "指定した場合、この PR 番号1件だけを取得する（assignee・state は無視）",
     },
     state: {
-      type: ['string', 'null'],
-      enum: ['open', 'closed', 'merged', 'all', null],
-      description: 'PR の状態フィルタ。未指定なら open',
+      type: ["string", "null"],
+      enum: ["open", "closed", "merged", "all", null],
+      description: "PR の状態フィルタ。未指定なら open",
     },
   },
-  required: ['assignee', 'number', 'state'],
-} as const satisfies Schema
+  required: ["assignee", "number", "state"],
+} as const satisfies Schema;
 
-export function gitPrList(args: Infer<typeof ARGS_SCHEMA>): string | null {
-  if (args.number) {
-    return runCommand([
-      `gh pr view ${args.number} --repo ${TARGET_REPO} --json number,title,url,mergeable,state`,
-    ])
-  }
+const RAW_PR_SCHEMA = {
+  type: "object",
+  properties: {
+    number: { type: "integer" },
+    title: { type: "string" },
+    url: { type: "string" },
+    mergeable: { type: "string" },
+    state: { type: "string" },
+    body: { type: ["string", "null"] },
+    headRefName: { type: "string" },
+    author: {
+      type: "object",
+      properties: { login: { type: "string" } },
+      required: ["login"],
+    },
+    closesIssue: {
+      type: ["integer", "null"],
+      description:
+        '本文の "Closes #N" から抽出した対応issue番号。無ければ null',
+    },
+  },
+  required: [
+    "number",
+    "title",
+    "url",
+    "mergeable",
+    "state",
+    "body",
+    "headRefName",
+    "author",
+    "closesIssue",
+  ],
+} as const satisfies Schema;
 
-  const authorFlag = args.assignee ? `--author ${args.assignee} ` : ''
-  const state = args.state ?? 'open'
-  return runCommand([
-    `gh pr list --repo ${TARGET_REPO} ${authorFlag}--state ${state} --json number,title,url,mergeable,state`,
-  ])
+export type RawPr = Infer<typeof RAW_PR_SCHEMA>;
+type FetchedPr = Omit<RawPr, "closesIssue">;
+
+const FIELDS = Object.keys(RAW_PR_SCHEMA.properties)
+  .filter((key) => key !== "closesIssue")
+  .join(",");
+
+function withClosesIssue(pr: FetchedPr): RawPr {
+  return {
+    ...pr,
+    closesIssue: Number(pr.body?.match(/closes #(\d+)/i)?.[1]) || null,
+  };
 }
 
-respond(gitPrList(getArgs(ARGS_SCHEMA)))
+export function gitPrList(args: Infer<typeof ARGS_SCHEMA>): RawPr[] {
+  const raw = args.number
+    ? runCommand([`gh pr view ${args.number} --repo ${TARGET_REPO} --json ${FIELDS}`])
+    : runCommand([
+        `gh pr list --repo ${TARGET_REPO} ${args.assignee ? `--author ${args.assignee} ` : ""}--state ${args.state ?? "open"} --json ${FIELDS}`,
+      ]);
+  if (!raw) return [];
+
+  const parsed: FetchedPr | FetchedPr[] = JSON.parse(raw);
+  return (Array.isArray(parsed) ? parsed : [parsed]).map(withClosesIssue);
+}
+
+respond(gitPrList(getArgs(ARGS_SCHEMA)));

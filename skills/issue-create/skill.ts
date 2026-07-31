@@ -28,7 +28,7 @@ export function issueCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
     case 'github':
       writeFile(args.tempFilePath, args.body)
       return runCommand([
-        `gh issue create --repo ${TARGET_REPO} --title ${args.title} --body-file ${args.tempFilePath} --add-assignee ${ASSIGNEE} && rm -f ${args.tempFilePath}`,
+        `gh issue create --repo ${TARGET_REPO} --title ${args.title} --body-file ${args.tempFilePath} --assignee ${ASSIGNEE} && rm -f ${args.tempFilePath}`,
       ])
     default:
       return runTool(

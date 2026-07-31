@@ -87,6 +87,18 @@ const STRUCTURED_FINDINGS_SCHEMA = {
   required: ['findings'],
 }
 
+const DEDUP_FINDINGS_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: FINDING_ITEM_SCHEMA,
+      description: 'items のうち、existing のどれとも重複しない新規の指摘のみ',
+    },
+  },
+  required: ['items'],
+}
+
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 
 async function mergeAndVerify(pr) {
@@ -152,69 +164,81 @@ const reviewStatus = await agent(
   { agentType: 'git-pr-review-status', schema: REVIEW_STATUS_SCHEMA, phase: '状態確認', label: `pr #${pr.number} 状態確認` }
 )
 
-let resolved = !reviewStatus.hasComments || reviewStatus.allResolved
-
-if (!resolved) {
+if (reviewStatus.hasComments && !reviewStatus.allResolved) {
   const fixReview = await agent(
     JSON.stringify({ workingDir: worktreePath, prNumber: pr.number }),
     { agentType: 'git-pr-review-verify', schema: VERIFY_SCHEMA, phase: '状態確認', label: `pr #${pr.number} 修正確認` }
   )
-  resolved = fixReview.allAddressed
+
+  if (!fixReview.allAddressed) {
+    const result = `pr #${pr.number}: 未解決の既存指摘あり`
+    log(result)
+    return { result }
+  }
+}
+
+// ─── Phase 2: コードレビュー ────────────────────────────────
+phase('コードレビュー')
+
+const codeReview = await agent(
+  JSON.stringify({ workingDir: worktreePath, mode: 'check' }),
+  { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} code-review` }
+)
+
+let newFindingsCount = 0
+let postResult = null
+
+if (!codeReview.clean) {
+  const structured = await agent(
+    dedent`
+      以下のレビュー指摘を、ファイル・行ごとに分割した配列に整形してください。
+
+      ${codeReview.findings}
+    `,
+    { schema: STRUCTURED_FINDINGS_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} 指摘の構造化` }
+  )
+
+  const existingComments = await agent(
+    JSON.stringify({ prNumber: pr.number }),
+    { agentType: 'git-pr-comments-list', phase: 'コードレビュー', label: `pr #${pr.number} 既存コメント取得` }
+  )
+
+  const newFindings = await agent(
+    JSON.stringify({ items: structured.findings, existing: existingComments, similarityLevel: null }),
+    { agentType: 'dedup-items', schema: DEDUP_FINDINGS_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出` }
+  )
+
+  newFindingsCount = newFindings.items.length
+
+  if (newFindingsCount > 0) {
+    postResult = await agent(
+      JSON.stringify({ workingDir: worktreePath, prNumber: pr.number, findings: newFindings.items }),
+      { agentType: 'git-pr-review-post', phase: 'コードレビュー', label: `pr #${pr.number} インラインコメント投稿` }
+    )
+
+    if (!postResult) {
+      const fallbackBody = newFindings.items
+        .map(f => `**${f.path}:${f.line} — ${f.title}**\n\n${f.body}`)
+        .join('\n\n---\n\n')
+      postResult = await agent(
+        JSON.stringify({ workingDir: worktreePath, prNumber: pr.number, body: fallbackBody, screenshots: null }),
+        { agentType: 'git-pr-comment', phase: 'コードレビュー', label: `pr #${pr.number} 通常コメントへフォールバック` }
+      )
+    }
+  }
 }
 
 let result
 
-if (!resolved) {
-  result = `pr #${pr.number}: 未解決の指摘あり`
-} else if (!reviewStatus.hasComments) {
-  // ─── Phase 2: コードレビュー ────────────────────────────────
-  phase('コードレビュー')
-
-  const codeReview = await agent(
-    JSON.stringify({ workingDir: worktreePath, mode: 'check' }),
-    { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} code-review` }
-  )
-
-  if (codeReview.clean) {
-    // ─── Phase 3: マージ ──────────────────────────────────────
-    phase('マージ')
-    const { merged, note } = await mergeAndVerify(pr)
-    result = merged ? `pr #${pr.number}: 指摘なし、マージ完了` : `pr #${pr.number}: 指摘なしだが未マージ（${note}）`
-  } else {
-    const structured = await agent(
-      dedent`
-        以下のレビュー指摘を、ファイル・行ごとに分割した配列に整形してください。
-
-        ${codeReview.findings}
-      `,
-      { schema: STRUCTURED_FINDINGS_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} 指摘の構造化` }
-    )
-
-    const existingComments = await agent(
-      JSON.stringify({ prNumber: pr.number }),
-      { agentType: 'git-pr-comments-list', phase: 'コードレビュー', label: `pr #${pr.number} 既存コメント取得` }
-    )
-
-    const newFindings = await agent(
-      JSON.stringify({ items: structured.findings, existing: existingComments, similarityLevel: null }),
-      { agentType: 'dedup-items', phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出` }
-    )
-
-    if (newFindings.length === 0) {
-      result = `pr #${pr.number}: code-review で指摘あり（すべて投稿済みのため新規コメントなし）`
-    } else {
-      await agent(
-        JSON.stringify({ workingDir: worktreePath, prNumber: pr.number, findings: newFindings }),
-        { agentType: 'git-pr-review-post', phase: 'コードレビュー', label: `pr #${pr.number} インラインコメント投稿` }
-      )
-      result = `pr #${pr.number}: code-review で新規指摘 ${newFindings.length}件を投稿`
-    }
-  }
+if (newFindingsCount > 0) {
+  result = postResult
+    ? `pr #${pr.number}: code-review で新規指摘 ${newFindingsCount}件を投稿`
+    : `pr #${pr.number}: code-review で新規指摘 ${newFindingsCount}件を検出したが投稿失敗`
 } else {
   // ─── Phase 3: マージ ──────────────────────────────────────
   phase('マージ')
   const { merged, note } = await mergeAndVerify(pr)
-  result = merged ? `pr #${pr.number}: 指摘すべて解消済み、マージ完了` : `pr #${pr.number}: 指摘は解消済みだが未マージ（${note}）`
+  result = merged ? `pr #${pr.number}: 指摘なし、マージ完了` : `pr #${pr.number}: 指摘なしだが未マージ（${note}）`
 }
 
 log(result)
