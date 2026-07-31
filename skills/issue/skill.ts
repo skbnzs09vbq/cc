@@ -1,82 +1,30 @@
+import { createBranchName } from '../create-branch-name/skill.js'
 import { BASE_BRANCH } from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
 import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
 
-remember([
-  'タスク管理ツールは読み取りのみ行うこと（更新・コメント等は行わない）',
-  'git commit, git push は、ユーザーの明示的な許可を得てから実行すること',
-  'PR は作成しないこと',
-])
-
-const issueInput = parseArgs()
-
-// ─── Phase 1: 計画立案 ─────────────────────────────────────────
-phase('計画立案')
-
-const planResult: string = Skill('plan-issue', issueInput)
-
-const PLAN_RESULT_SCHEMA: Schema = {
+const PLAN_RESULT_SCHEMA = {
   type: 'object',
   properties: {
     issueId: { type: 'string' },
     planContent: { type: 'string' },
   },
   required: ['issueId', 'planContent'],
-}
+} as const satisfies Schema
 
-const plan = complete(
-  `以下の plan-issue の結果から issueId・planContent を抽出してください。\n\n${planResult}`,
-  PLAN_RESULT_SCHEMA,
-)
-
-// ─── Phase 2: ブランチ作成 ───────────────────────────────────
-phase('ブランチ作成')
-
-const branchCandidates = Skill('create-branch-name', plan.planContent)
-
-const BRANCH_SELECTION_SCHEMA: Schema = {
+const BASE_BRANCH_SCHEMA = {
   type: 'object',
   properties: {
-    branchName: {
-      type: 'string',
-      description: '候補の中から最適な1つを選んだブランチ名',
-    },
     baseBranch: {
       type: ['string', 'null'],
       description: '実装計画に分岐元として明記されているブランチがあればその名前。無ければ null',
     },
   },
-  required: ['branchName', 'baseBranch'],
-}
+  required: ['baseBranch'],
+} as const satisfies Schema
 
-const branchSelection = complete(
-  dedent`
-    以下のブランチ名候補から最適な1つを選んでください。
-    また、以下の実装計画に分岐元として明記されているブランチがあれば baseBranch に、なければ null を返してください。
-
-    候補:
-    ${branchCandidates}
-
-    実装計画:
-    ${plan.planContent}
-  `,
-  BRANCH_SELECTION_SCHEMA,
-)
-
-const base = branchSelection.baseBranch || BASE_BRANCH
-
-runCommand(['git fetch origin', `git switch -c ${branchSelection.branchName} origin/${base}`])
-
-// ─── Phase 3: 実装 ──────────────────────────────────────────────
-phase('実装')
-
-Skill('implement', plan.planContent)
-
-// ─── Phase 4: 自己レビュー・E2E 検証（両方問題なくなるまで繰り返す） ─
-phase('自己レビュー・E2E検証')
-
-const CHECK_RESULT_SCHEMA: Schema = {
+const CHECK_RESULT_SCHEMA = {
   type: 'object',
   properties: {
     clean: {
@@ -89,31 +37,77 @@ const CHECK_RESULT_SCHEMA: Schema = {
     },
   },
   required: ['clean', 'findings'],
-}
+} as const satisfies Schema
 
-let clean = false
-while (!clean) {
-  const review = Skill('review-diff')
-  const reviewResult = complete(
-    `以下のレビュー結果を判定してください。\n\n${review}`,
-    CHECK_RESULT_SCHEMA,
+export function issue(issueInput: string): string {
+  remember([
+    'タスク管理ツールは読み取りのみ行うこと（更新・コメント等は行わない）',
+    'git commit, git push は、ユーザーの明示的な許可を得てから実行すること',
+    'PR は作成しないこと',
+  ])
+
+  // ─── Phase 1: 計画立案 ─────────────────────────────────────────
+  phase('計画立案')
+
+  const planResult: string = Skill('plan-issue', issueInput)
+
+  const plan = complete(
+    `以下の plan-issue の結果から issueId・planContent を抽出してください。\n\n${planResult}`,
+    PLAN_RESULT_SCHEMA,
   )
 
-  const e2eReport = Skill(
-    'webapp-testing',
-    `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証してください。`,
-  )
-  const e2eResult = complete(
-    `以下の検証結果を判定してください。\n\n${e2eReport}`,
-    CHECK_RESULT_SCHEMA,
+  // ─── Phase 2: ブランチ作成 ───────────────────────────────────
+  phase('ブランチ作成')
+
+  const branchName = createBranchName({ workDescription: plan.planContent, single: true })
+
+  const { baseBranch } = complete(
+    dedent`
+      以下の実装計画に分岐元として明記されているブランチがあれば baseBranch に、なければ null を返してください。
+
+      実装計画:
+      ${plan.planContent}
+    `,
+    BASE_BRANCH_SCHEMA,
   )
 
-  clean = reviewResult.clean && e2eResult.clean
+  const base = baseBranch || BASE_BRANCH
 
-  if (!clean) {
-    const findings = [reviewResult.findings, e2eResult.findings].filter(Boolean).join('\n\n')
-    Skill('implement', findings)
+  runCommand(['git fetch origin', `git switch -c ${branchName} origin/${base}`])
+
+  // ─── Phase 3: 実装 ──────────────────────────────────────────────
+  phase('実装')
+
+  Skill('implement', plan.planContent)
+
+  // ─── Phase 4: 自己レビュー・E2E 検証（両方問題なくなるまで繰り返す） ─
+  phase('自己レビュー・E2E検証')
+
+  let clean = false
+  while (!clean) {
+    const reviewResult: { clean: boolean; findings: string | null } = Skill(
+      'review-diff',
+      JSON.stringify({ workingDir: '.', mode: 'check' }),
+    )
+
+    const e2eReport = Skill(
+      'webapp-testing',
+      `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証してください。`,
+    )
+    const e2eResult = complete(
+      `以下の検証結果を判定してください。\n\n${e2eReport}`,
+      CHECK_RESULT_SCHEMA,
+    )
+
+    clean = reviewResult.clean && e2eResult.clean
+
+    if (!clean) {
+      const findings = [reviewResult.findings, e2eResult.findings].filter(Boolean).join('\n\n')
+      Skill('implement', findings)
+    }
   }
+
+  return `${plan.issueId} 対応完了（実装 → 自己レビュー・E2E 検証まで完了）`
 }
 
-respond(`${plan.issueId} 対応完了（実装 → 自己レビュー・E2E 検証まで完了）`)
+respond(issue(parseArgs()))

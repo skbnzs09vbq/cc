@@ -86,14 +86,12 @@ if (plan.aborted) {
 phase('ブランチ作成')
 
 const branch = await agent(
-  dedent`
-    workingDir: ${worktreePath}
-    branchName: null
-
-    workDescription:
-    実装計画:
-    ${plan.planContent}
-  `,
+  JSON.stringify({
+    workingDir: worktreePath,
+    branchName: null,
+    baseBranch: null,
+    workDescription: `実装計画:\n${plan.planContent}`,
+  }),
   { agentType: 'create-branch', schema: BRANCH_SCHEMA, phase: 'ブランチ作成', label: `issue #${issue.number}` }
 )
 
@@ -121,12 +119,7 @@ let fixCount = 0
 for (let i = 0; i < maxIterations; i++) {
   const [review, e2e] = await parallel([
     () => agent(
-      dedent`
-        ${WORKDIR_NOTE}
-
-        引数なしで実行してください
-        指摘があれば clean:false と findings（指摘内容の要約）、指摘なしなら clean:true と findings:null を返してください
-      `,
+      JSON.stringify({ workingDir: worktreePath, mode: 'check' }),
       { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} review${i + 1}` }
     ),
     () => agent(
@@ -166,42 +159,26 @@ for (let i = 0; i < maxIterations; i++) {
 phase('コミット・PR作成')
 
 await agent(
-  dedent`
-    workingDir: ${worktreePath}
-    message: null
-    body: null
-  `,
+  JSON.stringify({ workingDir: worktreePath, message: null, body: null }),
   { agentType: 'git-commit', phase: 'コミット・PR作成', label: `issue #${issue.number} commit` }
 )
 await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    git push -u origin ${branch.branchName} を実行してください
-  `,
-  { phase: 'コミット・PR作成', label: `issue #${issue.number} push` }
+  JSON.stringify({ workingDir: worktreePath, branch: branch.branchName }),
+  { agentType: 'git-push', phase: 'コミット・PR作成', label: `issue #${issue.number} push` }
 )
 
 const pr = await agent(
-  dedent`
-    workingDir: ${worktreePath}
-    head: ${branch.branchName}
-    base: ${branch.baseBranch}
-    title: null
-    description: null
-    closesIssue: ${issue.number}
-    screenshots: ${JSON.stringify(lastE2e.screenshots ?? [])}
-
-    workDescription:
-    実装計画:
-    ${plan.planContent}
-
-    additionalBody:
-    ${!clean ? dedent`
-      ## 既知の指摘
-      ${findings}
-    ` : 'null'}
-  `,
+  JSON.stringify({
+    workingDir: worktreePath,
+    head: branch.branchName,
+    base: branch.baseBranch,
+    title: null,
+    description: null,
+    closesIssue: issue.number,
+    screenshots: lastE2e.screenshots ?? [],
+    workDescription: `実装計画:\n${plan.planContent}`,
+    additionalBody: !clean ? `## 既知の指摘\n${findings}` : null,
+  }),
   { agentType: 'create-pr', phase: 'コミット・PR作成', label: `issue #${issue.number} PR作成` }
 )
 

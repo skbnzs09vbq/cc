@@ -11,88 +11,7 @@ import {
 } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
 
-remember(['git commit・git push・PR 作成は絶対に行わないこと'])
-
-const arg = parseArgs()
-
-// ─── Phase 1: 入力種別判定 ─────────────────────────────────
-phase('入力種別判定')
-
-const existsLocally = runCommand([`Test-Path "${arg}" -PathType Leaf`])
-const isLocalPath = existsLocally != null && existsLocally.trim().toLowerCase() === 'true'
-
-let inputType
-switch (true) {
-  case arg.endsWith('.md') || isLocalPath:
-    inputType = 'plan'
-    break
-  case arg.startsWith('http'):
-    inputType = 'task_url'
-    break
-  default:
-    inputType = 'text'
-}
-
-// ─── Phase 2: 実装内容取得 ─────────────────────────────────
-phase('実装内容取得')
-
-let content
-switch (inputType) {
-  case 'plan':
-    content = readFile(arg)
-    break
-  case 'task_url':
-    switch (TASK_TRACKER) {
-      case 'notion':
-        content = runTool(
-          `ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${arg}") を呼び出す`,
-        )
-        break
-      case 'github':
-        content = runCommand([`gh issue view ${arg} --json title,body,comments`])
-        break
-      case 'linear':
-        content = runTool(`ToolSearch で Linear 用の fetch tool を探し、"${arg}" を取得する`)
-        break
-      default:
-        content = runTool(`WebFetch("${arg}")`)
-    }
-    break
-  default:
-    content = arg
-}
-
-// ─── Phase 3: テスト方針の確認 ─────────────────────────────
-phase('テスト方針の確認')
-
-const includesTests = complete(
-  dedent`
-    以下の実装内容にテストの実装が含まれるか判定してください。
-
-    実装内容:
-    ${content}
-  `,
-  { type: 'boolean' },
-)
-
-let testPolicy = null
-if (includesTests && TEST_POLICY_URL) {
-  testPolicy = runTool(`WebFetch("${TEST_POLICY_URL}")`)
-}
-
-// ─── Phase 4: 実装 ─────────────────────────────────────────
-phase('実装')
-
-complete(dedent`
-  以下の内容をもとに、Edit/Write/Bash 等の実際のツールで実装してください。
-
-  content:
-  ${content}
-
-  ${testPolicy ? `testPolicy:\n${testPolicy}` : ''}
-`)
-
-const SUMMARY_SCHEMA: Schema = {
+const SUMMARY_SCHEMA = {
   type: 'object',
   properties: {
     items: {
@@ -102,12 +21,94 @@ const SUMMARY_SCHEMA: Schema = {
     },
   },
   required: ['items'],
+} as const satisfies Schema
+
+export function implement(arg: string): string {
+  remember(['git commit・git push・PR 作成は絶対に行わないこと'])
+
+  // ─── Phase 1: 入力種別判定 ─────────────────────────────────
+  phase('入力種別判定')
+
+  const existsLocally = runCommand([`Test-Path "${arg}" -PathType Leaf`])
+  const isLocalPath = existsLocally != null && existsLocally.trim().toLowerCase() === 'true'
+
+  let inputType: 'plan' | 'task_url' | 'text'
+  switch (true) {
+    case arg.endsWith('.md') || isLocalPath:
+      inputType = 'plan'
+      break
+    case arg.startsWith('http'):
+      inputType = 'task_url'
+      break
+    default:
+      inputType = 'text'
+  }
+
+  // ─── Phase 2: 実装内容取得 ─────────────────────────────────
+  phase('実装内容取得')
+
+  let content: string | null
+  switch (inputType) {
+    case 'plan':
+      content = readFile(arg)
+      break
+    case 'task_url':
+      switch (TASK_TRACKER) {
+        case 'notion':
+          content = runTool(
+            `ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${arg}") を呼び出す`,
+          )
+          break
+        case 'github':
+          content = runCommand([`gh issue view ${arg} --json title,body,comments`])
+          break
+        case 'linear':
+          content = runTool(`ToolSearch で Linear 用の fetch tool を探し、"${arg}" を取得する`)
+          break
+        default:
+          content = runTool(`WebFetch("${arg}")`)
+      }
+      break
+    default:
+      content = arg
+  }
+
+  // ─── Phase 3: テスト方針の確認 ─────────────────────────────
+  phase('テスト方針の確認')
+
+  const includesTests = complete(
+    dedent`
+      以下の実装内容にテストの実装が含まれるか判定してください。
+
+      実装内容:
+      ${content}
+    `,
+    { type: 'boolean' } as const,
+  )
+
+  let testPolicy = null
+  if (includesTests && TEST_POLICY_URL) testPolicy = runTool(`WebFetch("${TEST_POLICY_URL}")`)
+
+  // ─── Phase 4: 実装 ─────────────────────────────────────────
+  phase('実装')
+
+  complete(dedent`
+    以下の内容をもとに、Edit/Write/Bash 等の実際のツールで実装してください。
+
+    content:
+    ${content}
+
+    ${testPolicy ? `testPolicy:\n${testPolicy}` : ''}
+  `)
+
+  const result = complete('実装で対応した内容をすべて箇条書きで列挙してください。', SUMMARY_SCHEMA)
+
+  return dedent`
+    ## 実装完了
+
+    ${result.items.map((item) => `- ${item}`).join('\n')}
+  `
 }
 
-const result = complete('実装で対応した内容をすべて箇条書きで列挙してください。', SUMMARY_SCHEMA)
-
-respond(dedent`
-  ## 実装完了
-
-  ${result.items.map((item: string) => `- ${item}`).join('\n')}
-`)
+const arg = parseArgs()
+respond(implement(arg))

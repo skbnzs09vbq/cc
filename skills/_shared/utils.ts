@@ -1,6 +1,8 @@
 export function dedent(strings: TemplateStringsArray, ...values: any[]): string {
   const bodyLines = strings.flatMap((s) => s.split('\n').slice(1)).filter((l) => l.trim())
-  const indent = bodyLines.length ? Math.min(...bodyLines.map((l) => l.match(/^ */)![0].length)) : 0
+  const indent = bodyLines.length
+    ? Math.min(...bodyLines.map((l) => (l.match(/^ */)?.[0] ?? '').length))
+    : 0
   const strip = (s: string) =>
     s
       .split('\n')

@@ -1,8 +1,9 @@
+import { createBranchName } from '../create-branch-name/skill.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, askUser, complete, respond, runCommand } from '../_shared/complete.js'
-import { dedent } from '../_shared/utils.js'
+import { type Schema, askUser, exit, respond, runCommand } from '../_shared/complete.js'
+import type { Infer } from '../_shared/infer.js'
 
-const ARGS_SCHEMA: Schema = {
+export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
     workingDir: { type: 'string', description: 'ブランチ作成を実行するディレクトリ' },
@@ -20,39 +21,29 @@ const ARGS_SCHEMA: Schema = {
     },
   },
   required: ['workingDir', 'branchName', 'baseBranch', 'workDescription'],
-}
+} as const satisfies Schema
 
-const {
-  workingDir,
-  branchName: inputBranchName,
-  baseBranch,
-  workDescription,
-} = getArgs<{
-  workingDir: string
-  branchName: string | null
+export function createBranch(args: Infer<typeof ARGS_SCHEMA>): {
+  branchName: string
   baseBranch: string | null
-  workDescription: string | null
-}>(ARGS_SCHEMA)
+} {
+  const { workingDir, baseBranch, workDescription } = args
+  let { branchName } = args
 
-let branchName = inputBranchName
-if (!branchName) {
-  const description = workDescription ?? askUser('ブランチ名を決めるための作業内容を教えてください')
-  const candidates = Skill('create-branch-name', description)
-  branchName = complete<string>(
-    dedent`
-      以下の候補から最も適切な1つを選んでください
-      実装内容が読み取りにくくても、"chore/add-placeholder" のような汎用名は選ばないこと
+  if (!branchName) {
+    const description =
+      workDescription ?? askUser('ブランチ名を決めるための作業内容を教えてください')
+    if (!description) exit('branchName を決めるための作業内容が得られませんでした')
+    branchName = createBranchName({ workDescription: description, single: true })
+  }
 
-      ${candidates}
-    `,
-    { type: 'string', description: '選んだブランチ名' },
+  runCommand(
+    baseBranch
+      ? [`cd ${workingDir} && git fetch origin && git switch -c ${branchName} origin/${baseBranch}`]
+      : [`cd ${workingDir} && git switch -c ${branchName}`],
   )
+
+  return { branchName, baseBranch }
 }
 
-runCommand(
-  baseBranch
-    ? [`cd ${workingDir} && git fetch origin && git switch -c ${branchName} origin/${baseBranch}`]
-    : [`cd ${workingDir} && git switch -c ${branchName}`],
-)
-
-respond({ branchName, baseBranch })
+respond(createBranch(getArgs(ARGS_SCHEMA)))

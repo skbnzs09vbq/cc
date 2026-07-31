@@ -197,11 +197,7 @@ if (!resolved) {
   phase('コードレビュー')
 
   const codeReview = await agent(
-    dedent`
-      ${WORKDIR_NOTE}
-
-      引数なしで実行してください
-    `,
+    JSON.stringify({ workingDir: worktreePath, mode: 'check' }),
     { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'コードレビュー', label: `pr #${pr.number} code-review` }
   )
 

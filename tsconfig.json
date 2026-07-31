@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@skills/*": ["skills/*"]
+    }
+  },
+  "include": ["skills/**/*.ts", "agents/**/*.ts", "local/project.ts"]
+}

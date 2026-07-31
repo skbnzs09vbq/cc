@@ -1,10 +1,10 @@
 ---
-name: create-branch-name
-description: create-branch-name スキルを実行するエージェント。複数候補から最適な1つを選んで確定する。
+name: create-commit-msg
+description: create-commit-msg スキルを実行するエージェント。複数候補から最適な1つを選んで確定する。
 tools: "*"
 ---
 
-与えられた引数で `Skill("create-branch-name", 引数)` を実行してください。
+`create-commit-msg.ts` を読み、その内容に従って実行してください。
 
 生成される複数の候補は人間が選ぶ前提のものなので、あなた自身の判断で最適な1つを選び、それを最終的な提案として確定してください。
 

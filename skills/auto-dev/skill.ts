@@ -18,33 +18,10 @@ import {
   runCommand,
   writeFile,
 } from '../_shared/complete.js'
+import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
-if (!USE_AUTO_DEV) {
-  exit('このプロジェクトでは auto-dev が無効化されています（project.ts の USE_AUTO_DEV を確認）')
-}
-
-remember([
-  'このスキルの役割は起動判定・状態管理・workflow の管理（起動先の選定）まで。issue/PR の実装内容そのものには立ち入らない',
-  'Workflow の起動は必ず本物の Workflow() 呼び出しで行う（シミュレーションしない）',
-])
-
 const CRON_PROMPT = 'auto-dev スキルを実行してください。'
-
-const cronList = String(CronList())
-const alreadyScheduled = complete(
-  dedent`
-    以下は CronList() の実行結果です。
-    prompt に "${CRON_PROMPT}" を含むジョブが既に登録されているか判断してください。
-
-    ${cronList}
-  `,
-  { type: 'boolean' },
-)
-if (!alreadyScheduled) {
-  CronCreate({ cron: '* * * * *', prompt: CRON_PROMPT, recurring: true })
-}
-
 const STATE_PATH = '.claude/local/running-workflows.json'
 
 type WorkflowType = 'auto-dev' | 'pr-review' | 'direction'
@@ -74,85 +51,7 @@ type RunningEntry = {
   launchedAt: string
 }
 
-function formatRunning(entries: RunningEntry[]): string {
-  if (entries.length === 0) return '(実行中の workflow なし)'
-  return entries.map((entry) => `- ${entry.target} [${entry.kind || entry.type}]`).join('\n')
-}
-
-// ─── Phase 1: 状態読み込み・プルーニング ─────────────────────────
-phase('状態読み込み・プルーニング')
-
-const raw = readFile(STATE_PATH)
-const running: RunningEntry[] = raw ? JSON.parse(raw).running : []
-
-const stillRunning = running.filter((entry) =>
-  String(TaskOutput({ task_id: entry.taskId, block: false, timeout: 0 })).includes(
-    '<status>running</status>',
-  ),
-)
-
-writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
-
-// ─── Phase 2: 起動判定 ────────────────────────────────────────
-phase('起動判定')
-
-if (stillRunning.length >= AUTO_DEV_MAX_CONCURRENT) {
-  respond(dedent`
-    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT} 件のため、今回は新規起動しません
-
-    ${formatRunning(stillRunning)}
-  `)
-  exit()
-}
-
-const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, direction: 0 }
-for (const entry of stillRunning) counts[entry.type]++
-
-const openIssueCount =
-  Number(
-    runCommand([
-      `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number --jq length`,
-    ]),
-  ) || 0
-const openPrCount =
-  Number(
-    runCommand([
-      `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number --jq length`,
-    ]),
-  ) || 0
-
-const MAX_CONCURRENT_DIRECTION = 1
-const DIRECTION_ISSUE_BACKLOG_LIMIT = 5
-
-const directionAllowed =
-  counts['direction'] < MAX_CONCURRENT_DIRECTION && openIssueCount < DIRECTION_ISSUE_BACKLOG_LIMIT
-
-const HAS_TARGET: Record<WorkflowType, boolean> = {
-  'auto-dev': openIssueCount > 0 || openPrCount > 0,
-  'pr-review': openPrCount > 0,
-  direction: directionAllowed,
-}
-
-const eligible = (Object.keys(TARGET_RATIO) as WorkflowType[]).filter((t) => HAS_TARGET[t])
-
-if (eligible.length === 0) {
-  respond(dedent`
-    対応対象の issue・PR が無く、direction も起動条件（同時実行${MAX_CONCURRENT_DIRECTION}件まで・open issue ${DIRECTION_ISSUE_BACKLOG_LIMIT}件未満）を満たさないため、今回は新規起動しません
-
-    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
-    ${formatRunning(stillRunning)}
-  `)
-  exit()
-}
-
-const nextType: WorkflowType = eligible
-  .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
-  .reduce((best, t) => (counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best))
-
-// ─── Phase 3: workflow 起動 ────────────────────────────────────
-phase('workflow 起動')
-
-const DETECTED_SCHEMA: Schema = {
+const DETECTED_SCHEMA = {
   type: 'object',
   properties: {
     issues: {
@@ -170,7 +69,8 @@ const DETECTED_SCHEMA: Schema = {
           },
           blockedReason: {
             type: ['string', 'null'],
-            description: 'blocked が true の場合、何が前提でブロックされているかを簡潔に。false の場合は null',
+            description:
+              'blocked が true の場合、何が前提でブロックされているかを簡潔に。false の場合は null',
           },
         },
         required: ['number', 'url', 'title', 'blocked', 'blockedReason'],
@@ -194,15 +94,29 @@ const DETECTED_SCHEMA: Schema = {
     },
   },
   required: ['issues', 'prs'],
+} as const satisfies Schema
+
+type Detected = Infer<typeof DETECTED_SCHEMA>
+type IssueTarget = Detected['issues'][number]
+type PrTarget = Detected['prs'][number]
+
+type ResolvedTarget = {
+  scriptPath: string
+  args:
+    | { pr: PrTarget; worktreePath: string }
+    | { issue: IssueTarget; worktreePath: string; maxIterations: number }
+    | undefined
+  kind: 'issue' | 'pr-comment' | null
+  target: string
+  worktreePath: string | null
 }
 
-function resolveAutoDevTarget(): {
-  scriptPath: string
-  args: any
-  kind: 'issue' | 'pr-comment'
-  target: string
-  worktreePath: string
-} | null {
+function formatRunning(entries: RunningEntry[]): string {
+  if (entries.length === 0) return '(実行中の workflow なし)'
+  return entries.map((entry) => `- ${entry.target} [${entry.kind || entry.type}]`).join('\n')
+}
+
+function resolveAutoDevTarget(stillRunning: RunningEntry[]): ResolvedTarget | null {
   const openIssues = runCommand([
     `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number,url,title,body`,
   ])
@@ -213,7 +127,7 @@ function resolveAutoDevTarget(): {
     `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,comments,reviews`,
   ])
 
-  const detected = complete<{ issues: any[]; prs: any[] }>(
+  const detected = complete(
     dedent`
       以下の gh CLI 実行結果から、対応が必要な issue・PR を判定してください。
       過去に処理済みかどうかは問わず、現時点で対応が必要なものすべてが対象です。
@@ -243,7 +157,8 @@ function resolveAutoDevTarget(): {
   const pr = detected.prs.find((pr) => !inProgress.includes(`issue #${pr.issueNumber}`))
 
   const PRIORITY_RANK: Record<string, number> = { high: 0, middle: 1, low: 2 }
-  const priorityOf = (title: string) => PRIORITY_RANK[title.match(/^\[(high|middle|low)\]/)?.[1] ?? 'middle']
+  const priorityOf = (title: string) =>
+    PRIORITY_RANK[title.match(/^\[(high|middle|low)\]/)?.[1] ?? 'middle']
 
   const issue = detected.issues
     .filter((issue) => !issue.blocked)
@@ -266,7 +181,7 @@ function resolveAutoDevTarget(): {
   if (issue) {
     const worktreePath = Skill('create-worktree', `issueNumber: ${issue.number}, branch: null`)
     return {
-      scriptPath: SCRIPT_PATHS['issue'],
+      scriptPath: SCRIPT_PATHS.issue,
       args: { issue, worktreePath, maxIterations: AUTO_DEV_ISSUE_MAX_ITERATIONS },
       kind: 'issue',
       target: `issue #${issue.number}`,
@@ -276,27 +191,23 @@ function resolveAutoDevTarget(): {
   return null
 }
 
-function resolvePrReviewTarget(): {
-  scriptPath: string
-  args: any
-  kind: null
-  target: string
-  worktreePath: string
-} | null {
+type RawPr = { number: number; url: string; headRefName: string; body: string | null }
+
+function resolvePrReviewTarget(stillRunning: RunningEntry[]): ResolvedTarget | null {
   const openPrsJson = runCommand([
     `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number,url,headRefName,body`,
   ])
-  const prs = JSON.parse(openPrsJson || '[]')
-    .map((pr: any) => ({
+  const prs = (JSON.parse(openPrsJson || '[]') as RawPr[])
+    .map((pr) => ({
       number: pr.number,
       url: pr.url,
       branch: pr.headRefName,
       issueNumber: Number((pr.body || '').match(/Closes #(\d+)/i)?.[1]) || null,
     }))
-    .filter((pr: any) => pr.issueNumber)
+    .filter((pr): pr is PrTarget => pr.issueNumber !== null)
 
   const inProgress = stillRunning.map((entry) => entry.target).join(' ')
-  const pr = prs.find((pr: any) => !inProgress.includes(`issue #${pr.issueNumber}`))
+  const pr = prs.find((pr) => !inProgress.includes(`issue #${pr.issueNumber}`))
   if (!pr) return null
 
   const worktreePath = Skill(
@@ -312,52 +223,151 @@ function resolvePrReviewTarget(): {
   }
 }
 
-let target
-switch (nextType) {
-  case 'auto-dev':
-    target = resolveAutoDevTarget()
-    break
-  case 'pr-review':
-    target = resolvePrReviewTarget()
-    break
-  case 'direction':
-    target = {
-      scriptPath: SCRIPT_PATHS['direction'],
-      args: undefined,
-      kind: null,
-      target: 'direction 生成',
-      worktreePath: null,
-    }
-    break
-}
+export function autoDev(): void {
+  if (!USE_AUTO_DEV)
+    exit('このプロジェクトでは auto-dev が無効化されています（project.ts の USE_AUTO_DEV を確認）')
 
-if (!target) {
+  remember([
+    'このスキルの役割は起動判定・状態管理・workflow の管理（起動先の選定）まで。issue/PR の実装内容そのものには立ち入らない',
+    'Workflow の起動は必ず本物の Workflow() 呼び出しで行う（シミュレーションしない）',
+  ])
+
+  const cronList = String(CronList())
+  const alreadyScheduled = complete(
+    dedent`
+      以下は CronList() の実行結果です。
+      prompt に "${CRON_PROMPT}" を含むジョブが既に登録されているか判断してください。
+
+      ${cronList}
+    `,
+    { type: 'boolean' } as const,
+  )
+  if (!alreadyScheduled) CronCreate({ cron: '* * * * *', prompt: CRON_PROMPT, recurring: true })
+
+  // ─── Phase 1: 状態読み込み・プルーニング ─────────────────────────
+  phase('状態読み込み・プルーニング')
+
+  const raw = readFile(STATE_PATH)
+  const running: RunningEntry[] = raw ? JSON.parse(raw).running : []
+
+  const stillRunning = running.filter((entry) =>
+    String(TaskOutput({ task_id: entry.taskId, block: false, timeout: 0 })).includes(
+      '<status>running</status>',
+    ),
+  )
+
+  writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
+
+  // ─── Phase 2: 起動判定 ────────────────────────────────────
+  phase('起動判定')
+
+  if (stillRunning.length >= AUTO_DEV_MAX_CONCURRENT) {
+    respond(dedent`
+      実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT} 件のため、今回は新規起動しません
+
+      ${formatRunning(stillRunning)}
+    `)
+    exit()
+  }
+
+  const counts: Record<WorkflowType, number> = { 'auto-dev': 0, 'pr-review': 0, direction: 0 }
+  for (const entry of stillRunning) counts[entry.type]++
+
+  const openIssueCount =
+    Number(
+      runCommand([
+        `gh issue list --repo ${TARGET_REPO} --assignee ${ASSIGNEE} --state open --json number --jq length`,
+      ]),
+    ) || 0
+  const openPrCount =
+    Number(
+      runCommand([
+        `gh pr list --repo ${TARGET_REPO} --author ${ASSIGNEE} --state open --json number --jq length`,
+      ]),
+    ) || 0
+
+  const MAX_CONCURRENT_DIRECTION = 1
+  const DIRECTION_ISSUE_BACKLOG_LIMIT = 5
+
+  const directionAllowed =
+    counts.direction < MAX_CONCURRENT_DIRECTION && openIssueCount < DIRECTION_ISSUE_BACKLOG_LIMIT
+
+  const HAS_TARGET: Record<WorkflowType, boolean> = {
+    'auto-dev': openIssueCount > 0 || openPrCount > 0,
+    'pr-review': openPrCount > 0,
+    direction: directionAllowed,
+  }
+
+  const eligible = (Object.keys(TARGET_RATIO) as WorkflowType[]).filter((t) => HAS_TARGET[t])
+
+  if (eligible.length === 0) {
+    respond(dedent`
+      対応対象の issue・PR が無く、direction も起動条件（同時実行${MAX_CONCURRENT_DIRECTION}件まで・open issue ${DIRECTION_ISSUE_BACKLOG_LIMIT}件未満）を満たさないため、今回は新規起動しません
+
+      実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts.direction}）
+      ${formatRunning(stillRunning)}
+    `)
+    exit()
+  }
+
+  const nextType: WorkflowType = eligible
+    .sort((a, b) => TARGET_RATIO[b] - TARGET_RATIO[a])
+    .reduce((best, t) =>
+      counts[t] / TARGET_RATIO[t] < counts[best] / TARGET_RATIO[best] ? t : best,
+    )
+
+  // ─── Phase 3: workflow 起動 ────────────────────────────────────
+  phase('workflow 起動')
+
+  let target: ResolvedTarget | null
+  switch (nextType) {
+    case 'auto-dev':
+      target = resolveAutoDevTarget(stillRunning)
+      break
+    case 'pr-review':
+      target = resolvePrReviewTarget(stillRunning)
+      break
+    case 'direction':
+      target = {
+        scriptPath: SCRIPT_PATHS.direction,
+        args: undefined,
+        kind: null,
+        target: 'direction 生成',
+        worktreePath: null,
+      }
+      break
+  }
+
+  if (!target) {
+    respond(dedent`
+      対応対象の issue・PR がないため、今回は新規起動しません
+
+      実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts.direction}）
+      ${formatRunning(stillRunning)}
+    `)
+    exit()
+  }
+
+  const launch = Workflow({ scriptPath: target.scriptPath, args: target.args })
+  const taskId = String(launch).match(/Task ID:\s*(\S+)/)?.[1] ?? ''
+
+  stillRunning.push({
+    taskId,
+    type: nextType,
+    kind: target.kind,
+    target: target.target,
+    worktreePath: target.worktreePath,
+    launchedAt: new Date().toISOString(),
+  })
+  writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
+
+  counts[nextType]++
   respond(dedent`
-    対応対象の issue・PR がないため、今回は新規起動しません
+    ${nextType} を起動: ${target.target}
 
-    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
+    実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts.direction}）
     ${formatRunning(stillRunning)}
   `)
-  exit()
 }
 
-const launch = Workflow({ scriptPath: target.scriptPath, args: target.args })
-const taskId = String(launch).match(/Task ID:\s*(\S+)/)?.[1] ?? ''
-
-stillRunning.push({
-  taskId,
-  type: nextType,
-  kind: target.kind,
-  target: target.target,
-  worktreePath: target.worktreePath,
-  launchedAt: new Date().toISOString(),
-})
-writeFile(STATE_PATH, JSON.stringify({ running: stillRunning }, null, 2))
-
-counts[nextType]++
-respond(dedent`
-  ${nextType} を起動: ${target.target}
-
-  実行中 ${stillRunning.length}/${AUTO_DEV_MAX_CONCURRENT}（auto-dev:${counts['auto-dev']} pr-review:${counts['pr-review']} direction:${counts['direction']}）
-  ${formatRunning(stillRunning)}
-`)
+autoDev()

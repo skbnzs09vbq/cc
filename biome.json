@@ -22,5 +22,31 @@
       "semicolons": "asNeeded",
       "quoteStyle": "single"
     }
-  }
+  },
+  "overrides": [
+    {
+      "include": [
+        "skills/_shared/infer.ts",
+        "skills/_shared/complete.ts",
+        "skills/_shared/globals.ts",
+        "skills/_shared/utils.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    },
+    {
+      "include": ["skills/auto-dev/*-workflow.js"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }

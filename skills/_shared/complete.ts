@@ -1,20 +1,24 @@
+import type { Infer } from './infer.js'
 import { dedent } from './utils.js'
 
 export type JsonType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null'
 
 export interface Schema {
-  type?: JsonType | JsonType[]
-  enum?: any[]
+  type?: JsonType | readonly JsonType[]
+  enum?: readonly any[]
   description?: string
   properties?: Record<string, Schema>
-  required?: string[]
+  required?: readonly string[]
   items?: Schema
 }
 
-export declare function complete<T = any>(prompt: string, schema?: Schema): T
+export declare function complete<S extends Schema | undefined = undefined>(
+  prompt: string,
+  schema?: S,
+): S extends Schema ? Infer<S> : any
 
 export function generate(prompt: string): string {
-  return complete<string>(prompt, { type: 'string' })
+  return complete(prompt, { type: 'string' } as const)
 }
 
 export declare function respond(value: any): void
@@ -26,8 +30,13 @@ export function exit(value?: any): never {
   throw new ExitSignal()
 }
 
-export function receive<T = any>(schema: Schema = { type: 'string' }): T {
-  return complete<T>('ユーザーからの回答を受け取り、その内容を返してください。', schema)
+export function receive<S extends Schema | undefined = undefined>(
+  schema?: S,
+): S extends Schema ? Infer<S> : any {
+  return complete(
+    'ユーザーからの回答を受け取り、その内容を返してください。',
+    (schema ?? { type: 'string' }) as any,
+  ) as any
 }
 
 export declare function readFile(path: string): string | null
@@ -47,7 +56,7 @@ export function buildCommandPrompt(prompt: string, commands: string[]): string {
 export function runCommand(commands: string[]): string | null {
   return complete(buildCommandPrompt('その結果を返してください。', commands), {
     type: ['string', 'null'],
-  })
+  } as const)
 }
 
 export function remember(notes: string[]) {
@@ -58,9 +67,12 @@ export function remember(notes: string[]) {
   `)
 }
 
-export function askUser<T = any>(message: string, schema: Schema = { type: 'string' }): T {
+export function askUser<S extends Schema | undefined = undefined>(
+  message: string,
+  schema?: S,
+): S extends Schema ? Infer<S> : any {
   respond(message)
-  return receive<T>(schema)
+  return receive(schema)
 }
 
 export function runTool(tool: string): string | null {
@@ -71,6 +83,6 @@ export function runTool(tool: string): string | null {
 
       呼び出すツール: ${tool}
     `,
-    { type: ['string', 'null'] },
+    { type: ['string', 'null'] } as const,
   )
 }

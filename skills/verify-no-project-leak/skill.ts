@@ -4,23 +4,7 @@ import { dedent } from '../_shared/utils.js'
 const STATE_PATH = '.claude/local/verify-state.json'
 const TARGET_PATHS = ['project.example.ts', 'CLAUDE.md', 'agents', 'skills']
 
-// ─── Phase 1: 対象ファイルの読み込み ───────────────────────────
-phase('対象ファイルの読み込み')
-
-const LS_FILES = `git ls-files -z --cached --others --exclude-standard ${TARGET_PATHS.join(' ')}`
-
-const checksum = runCommand([
-  `cd .claude && ${LS_FILES} | sort -z | xargs -0 cat | sha256sum | awk '{print $1}'`,
-])?.trim()
-
-const contents = runCommand([
-  `cd .claude && ${LS_FILES} | sort -z | xargs -0 -I{} sh -c 'echo "=== {} ==="; cat "{}"'`,
-])
-
-// ─── Phase 2: project固有の実値・秘密情報の確認 ─────────────────
-phase('内容確認')
-
-const CHECK_SCHEMA: Schema = {
+const CHECK_SCHEMA = {
   type: 'object',
   properties: {
     clean: { type: 'boolean' },
@@ -38,38 +22,58 @@ const CHECK_SCHEMA: Schema = {
     },
   },
   required: ['clean', 'findings'],
-}
+} as const satisfies Schema
 
-const result = complete<{ clean: boolean; findings: { file: string; reason: string }[] }>(
-  dedent`
-    以下は project.example.ts・CLAUDE.md・agents/・skills/ 配下の全ファイル内容です。
-    これらは本来「どのプロジェクトでも使い回せる汎用テンプレート」であるべきファイルです
-    （project 固有の実値は .claude/local/ 配下にのみ置く規約になっています）。
+export function verifyNoProjectLeak(): string {
+  // ─── Phase 1: 対象ファイルの読み込み ───────────────────────────
+  phase('対象ファイルの読み込み')
 
-    次のようなものが紛れ込んでいないか確認してください:
-    - 特定プロジェクトの実際の値（実在するリポジトリURL・アカウント名・チケット接頭辞等。
-      "<org>/<repo>" のようなプレースホルダは問題なし）
-    - APIキー・トークン・パスワード等の秘密情報
+  const LS_FILES = `git ls-files -z --cached --others --exclude-standard ${TARGET_PATHS.join(' ')}`
 
-    ${contents}
-  `,
-  CHECK_SCHEMA,
-)
+  const checksum = runCommand([
+    `cd .claude && ${LS_FILES} | sort -z | xargs -0 cat | sha256sum | awk '{print $1}'`,
+  ])?.trim()
 
-// ─── Phase 3: 結果の反映 ─────────────────────────────────────
-phase('結果の反映')
+  const contents = runCommand([
+    `cd .claude && ${LS_FILES} | sort -z | xargs -0 -I{} sh -c 'echo "=== {} ==="; cat "{}"'`,
+  ])
 
-if (result.clean) {
-  writeFile(
-    STATE_PATH,
-    JSON.stringify({ verifiedChecksum: checksum, verifiedAt: new Date().toISOString() }, null, 2),
+  // ─── Phase 2: project固有の実値・秘密情報の確認 ─────────────────
+  phase('内容確認')
+
+  const result = complete(
+    dedent`
+      以下は project.example.ts・CLAUDE.md・agents/・skills/ 配下の全ファイル内容です。
+      これらは本来「どのプロジェクトでも使い回せる汎用テンプレート」であるべきファイルです
+      （project 固有の実値は .claude/local/ 配下にのみ置く規約になっています）。
+
+      次のようなものが紛れ込んでいないか確認してください:
+      - 特定プロジェクトの実際の値（実在するリポジトリURL・アカウント名・チケット接頭辞等。
+        "<org>/<repo>" のようなプレースホルダは問題なし）
+      - APIキー・トークン・パスワード等の秘密情報
+
+      ${contents}
+    `,
+    CHECK_SCHEMA,
   )
-  respond('project固有の情報は見つかりませんでした。検証済みとして記録しました。コミットして問題ありません。')
-} else {
-  respond(dedent`
+
+  // ─── Phase 3: 結果の反映 ─────────────────────────────────────
+  phase('結果の反映')
+
+  if (result.clean) {
+    writeFile(
+      STATE_PATH,
+      JSON.stringify({ verifiedChecksum: checksum, verifiedAt: new Date().toISOString() }, null, 2),
+    )
+    return 'project固有の情報は見つかりませんでした。検証済みとして記録しました。コミットして問題ありません。'
+  }
+
+  return dedent`
     以下の箇所に project 固有の実値・秘密情報の疑いがあります。
     修正してから再度このスキルを実行してください（検証済みになるまでコミットはブロックされます）。
 
     ${result.findings.map((f) => `- ${f.file}: ${f.reason}`).join('\n')}
-  `)
+  `
 }
+
+respond(verifyNoProjectLeak())

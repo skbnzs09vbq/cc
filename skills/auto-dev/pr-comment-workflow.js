@@ -27,8 +27,6 @@ const E2E_SCHEMA = {
   required: ['clean', 'findings', 'screenshots'],
 }
 
-const SCREENSHOT_NOTE = 'スクリーンショットは gh gist create などで公開 URL を取得し（gh api で raw_url を取得する等）、Markdown 画像として本文に埋め込んでください'
-
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
@@ -41,10 +39,7 @@ const summary = await agent(
   dedent`
     ${WORKDIR_NOTE}
 
-    url: ${pr.url}
-    autonomous: true
-
-    完了したら対応内容の要約を返してください
+    ${JSON.stringify({ url: pr.url, autonomous: true })}
   `,
   { agentType: 'resolving-pr-comments', phase: 'PR対応', label: `pr #${pr.number}` }
 )
@@ -63,35 +58,21 @@ const e2e = await agent(
 )
 
 await agent(
-  dedent`
-    workingDir: ${worktreePath}
-    message: null
-    body: null
-  `,
+  JSON.stringify({ workingDir: worktreePath, message: null, body: null }),
   { agentType: 'git-commit', phase: 'PR対応', label: `pr #${pr.number} commit` }
 )
 await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    git push を実行してください（${pr.branch} が upstream 未追跡なら git push -u origin ${pr.branch}）
-  `,
-  { phase: 'PR対応', label: `pr #${pr.number} push` }
+  JSON.stringify({ workingDir: worktreePath, branch: pr.branch }),
+  { agentType: 'git-push', phase: 'PR対応', label: `pr #${pr.number} push` }
 )
 await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    gh pr comment ${pr.number} で、以下の対応内容をまとめて PR に返信してください
-    本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出して --body-file で渡す等で実行してください
-    他PRのworkflowが並行実行中の可能性があるため、一時ファイルは共有スクラッチパッドではなく worktree内（例: ${worktreePath}/.pr_comment.md）に書き出すこと
-    ${e2e.screenshots.length ? SCREENSHOT_NOTE : ''}
-
-    対応内容:
-    ${summary}
-    ${e2e.screenshots.length ? `\nスクリーンショット（動作確認時に撮影したもの）:\n${e2e.screenshots.join('\n')}` : ''}
-  `,
-  { phase: 'PR対応', label: `pr #${pr.number} 返信` }
+  JSON.stringify({
+    workingDir: worktreePath,
+    prNumber: pr.number,
+    body: summary,
+    screenshots: e2e.screenshots.length ? e2e.screenshots : null,
+  }),
+  { agentType: 'comment-pr', phase: 'PR対応', label: `pr #${pr.number} 返信` }
 )
 
 const result = `pr #${pr.number} 対応完了`
