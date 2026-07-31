@@ -1,5 +1,5 @@
 import { TASK_TRACKER, TEST_POLICY_URL } from '../../local/project.js'
-import { parseArgs } from '../_shared/args.js'
+import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
   complete,
@@ -9,6 +9,7 @@ import {
   runCommand,
   runTool,
 } from '../_shared/complete.js'
+import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
 const SUMMARY_SCHEMA = {
@@ -23,21 +24,39 @@ const SUMMARY_SCHEMA = {
   required: ['items'],
 } as const satisfies Schema
 
-export function implement(arg: string): string {
+export const ARGS_SCHEMA = {
+  type: 'object',
+  properties: {
+    workingDir: {
+      type: ['string', 'null'],
+      description: '実装を行う作業ディレクトリ。未指定ならカレントディレクトリ',
+    },
+    input: {
+      type: 'string',
+      description: 'plan.md のパス・タスクURL・実装内容テキストのいずれか',
+    },
+  },
+  required: ['workingDir', 'input'],
+} as const satisfies Schema
+
+export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
+  const workingDir = args.workingDir ?? '.'
+  const { input } = args
+
   remember(['git commit・git push・PR 作成は絶対に行わないこと'])
 
   // ─── Phase 1: 入力種別判定 ─────────────────────────────────
   phase('入力種別判定')
 
-  const existsLocally = runCommand([`Test-Path "${arg}" -PathType Leaf`])
+  const existsLocally = runCommand([`cd "${workingDir}"; Test-Path "${input}" -PathType Leaf`])
   const isLocalPath = existsLocally != null && existsLocally.trim().toLowerCase() === 'true'
 
   let inputType: 'plan' | 'task_url' | 'text'
   switch (true) {
-    case arg.endsWith('.md') || isLocalPath:
+    case input.endsWith('.md') || isLocalPath:
       inputType = 'plan'
       break
-    case arg.startsWith('http'):
+    case input.startsWith('http'):
       inputType = 'task_url'
       break
     default:
@@ -50,27 +69,29 @@ export function implement(arg: string): string {
   let content: string | null
   switch (inputType) {
     case 'plan':
-      content = readFile(arg)
+      content = readFile(`${workingDir}/${input}`)
       break
     case 'task_url':
       switch (TASK_TRACKER) {
         case 'notion':
           content = runTool(
-            `ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${arg}") を呼び出す`,
+            `ToolSearch("select:mcp__claude_ai_Notion__notion-fetch") でスキーマを取得してから notion-fetch("${input}") を呼び出す`,
           )
           break
         case 'github':
-          content = runCommand([`gh issue view ${arg} --json title,body,comments`])
+          content = runCommand([
+            `cd ${workingDir} && gh issue view ${input} --json title,body,comments`,
+          ])
           break
         case 'linear':
-          content = runTool(`ToolSearch で Linear 用の fetch tool を探し、"${arg}" を取得する`)
+          content = runTool(`ToolSearch で Linear 用の fetch tool を探し、"${input}" を取得する`)
           break
         default:
-          content = runTool(`WebFetch("${arg}")`)
+          content = runTool(`WebFetch("${input}")`)
       }
       break
     default:
-      content = arg
+      content = input
   }
 
   // ─── Phase 3: テスト方針の確認 ─────────────────────────────
@@ -93,7 +114,9 @@ export function implement(arg: string): string {
   phase('実装')
 
   complete(dedent`
-    以下の内容をもとに、Edit/Write/Bash 等の実際のツールで実装してください。
+    作業ディレクトリ: ${workingDir}（Edit/Write/Bash 等の実際のツールでの変更はすべてこのディレクトリ内で行ってください）
+
+    以下の内容をもとに実装してください。
 
     content:
     ${content}
@@ -110,5 +133,4 @@ export function implement(arg: string): string {
   `
 }
 
-const arg = parseArgs()
-respond(implement(arg))
+respond(implement(getArgs(ARGS_SCHEMA)))

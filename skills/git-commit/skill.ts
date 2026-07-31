@@ -18,7 +18,7 @@ export function gitCommit(args: Infer<typeof ARGS_SCHEMA>): string {
   let { message, body } = args
 
   if (!message) {
-    const candidates = Skill('create-commit-msg')
+    const candidates = Skill('git-commit-message')
     const picked = complete(
       dedent`
         以下の候補から最も適切な1つを選んでください

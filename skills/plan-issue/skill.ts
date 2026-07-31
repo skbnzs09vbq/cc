@@ -237,8 +237,8 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     )
   let planContent = planResult.planContent
 
-  // ─── Phase 5: 複雑な実装の場合のみ grill-with-docs で精査する ─
-  phase('複雑な実装の場合のみ grill-with-docs で精査する')
+  // ─── Phase 5: 複雑な実装の場合のみ grill-me で精査する ─
+  phase('複雑な実装の場合のみ grill-me で精査する')
 
   const isComplex = complete(
     dedent`
@@ -254,18 +254,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     { type: 'boolean' } as const,
   )
 
-  if (isComplex) {
-    const critique = Skill('grill-with-docs')
-    planContent = complete(dedent`
-      grill-with-docs の指摘を反映して実装計画を更新してください。
-
-      実装計画:
-      ${planContent}
-
-      指摘:
-      ${critique}
-    `)
-  }
+  if (isComplex) planContent = Skill('grill-me', planContent)
 
   // ─── Phase 6: 計画を作成して提示する ───────────────────────────
   phase('計画を作成して提示する')

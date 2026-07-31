@@ -97,26 +97,26 @@ issue-workflow.js（skill.ts が選んだ issue 1件を処理する）
 │   ├── `plan-issue` に issue URL を渡し実装計画を作成
 │   └── 中止判定なら終了
 ├── ブランチ作成
-│   ├── `create-branch-name` で計画からブランチ名を決定
+│   ├── `git-branch-name` で計画からブランチ名を決定
 │   └── skill.ts が起動時に渡した worktree でブランチ切り替え
 ├── 実装
 │   └── `implement` に計画を渡して worktree 内で実装
 ├── レビュー・E2E検証（最大 maxIterations 回）
-│   ├── `review-diff`（静的レビュー）と `webapp-testing`（動作確認）を並列実行
+│   ├── `review-diff`（静的レビュー）と `e2e-test`（動作確認）を並列実行
 │   ├── 指摘があれば `implement` で修正 → 再検証
 │   └── 上限到達でも clean にならなければ終了
 └── commit・PR作成
-    ├── `create-commit-msg` でメッセージ生成
+    ├── `git-commit-message` でメッセージ生成
     ├── commit
     ├── push
-    ├── `draft-pr-description` で PR文面を作成
+    ├── `git-pr-draft` で PR文面を作成
     └── PR作成
 
 pr-comment-workflow.js（skill.ts が選んだ PR 1 件を処理する）
 └── PR対応
-    ├── `resolving-pr-comments` に PR URL を渡し指摘に対応
-    ├── `webapp-testing` で対応内容を動作確認
-    ├── `create-commit-msg` でメッセージ生成
+    ├── `git-pr-resolve-comments` に PR URL を渡し指摘に対応
+    ├── `e2e-test` で対応内容を動作確認
+    ├── `git-commit-message` でメッセージ生成
     ├── commit
     ├── push
     └── PR に対応内容を返信

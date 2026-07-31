@@ -95,7 +95,7 @@ async function mergeAndVerify(pr) {
   )
 
   if (check.state === 'MERGED') {
-    await agent(`Skill("remove-worktree", "issueNumber: ${pr.issueNumber}") を実行してください`, { phase: 'マージ', label: `pr #${pr.number} worktree削除` })
+    await agent(`Skill("git-worktree-remove", "issueNumber: ${pr.issueNumber}") を実行してください`, { phase: 'マージ', label: `pr #${pr.number} worktree削除` })
     return { merged: true, note: null }
   }
 
@@ -126,7 +126,7 @@ async function mergeAndVerify(pr) {
     )
 
     if (check.state === 'MERGED') {
-      await agent(`Skill("remove-worktree", "issueNumber: ${pr.issueNumber}") を実行してください`, { phase: 'マージ', label: `pr #${pr.number} worktree削除` })
+      await agent(`Skill("git-worktree-remove", "issueNumber: ${pr.issueNumber}") を実行してください`, { phase: 'マージ', label: `pr #${pr.number} worktree削除` })
       return { merged: true, note: null }
     }
 

@@ -1,4 +1,4 @@
-import { createBranchName } from '../create-branch-name/skill.js'
+import { gitBranchName } from '../git-branch-name/skill.js'
 import { BASE_BRANCH } from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
 import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
@@ -24,21 +24,6 @@ const BASE_BRANCH_SCHEMA = {
   required: ['baseBranch'],
 } as const satisfies Schema
 
-const CHECK_RESULT_SCHEMA = {
-  type: 'object',
-  properties: {
-    clean: {
-      type: 'boolean',
-      description: '問題が一切ないかどうか',
-    },
-    findings: {
-      type: ['string', 'null'],
-      description: 'clean が false の場合の問題内容。true の場合は null',
-    },
-  },
-  required: ['clean', 'findings'],
-} as const satisfies Schema
-
 export function issue(issueInput: string): string {
   remember([
     'タスク管理ツールは読み取りのみ行うこと（更新・コメント等は行わない）',
@@ -59,7 +44,7 @@ export function issue(issueInput: string): string {
   // ─── Phase 2: ブランチ作成 ───────────────────────────────────
   phase('ブランチ作成')
 
-  const branchName = createBranchName({ workDescription: plan.planContent, single: true })
+  const branchName = gitBranchName({ workDescription: plan.planContent, single: true })
 
   const { baseBranch } = complete(
     dedent`
@@ -90,13 +75,14 @@ export function issue(issueInput: string): string {
       JSON.stringify({ workingDir: '.', mode: 'check' }),
     )
 
-    const e2eReport = Skill(
-      'webapp-testing',
-      `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証してください。`,
-    )
-    const e2eResult = complete(
-      `以下の検証結果を判定してください。\n\n${e2eReport}`,
-      CHECK_RESULT_SCHEMA,
+    const e2eResult: { clean: boolean; findings: string | null } = Skill(
+      'e2e-test',
+      JSON.stringify({
+        workingDir: '.',
+        description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する。`,
+        serverCommand: null,
+        port: null,
+      }),
     )
 
     clean = reviewResult.clean && e2eResult.clean

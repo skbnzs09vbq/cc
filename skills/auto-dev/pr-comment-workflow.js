@@ -41,20 +41,17 @@ const summary = await agent(
 
     ${JSON.stringify({ url: pr.url, autonomous: true })}
   `,
-  { agentType: 'resolving-pr-comments', phase: 'PR対応', label: `pr #${pr.number}` }
+  { agentType: 'git-pr-resolve-comments', phase: 'PR対応', label: `pr #${pr.number}` }
 )
 
 const e2e = await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    以下の対応内容が正しく動作するか検証してください
-    検証中の要所でスクリーンショットを撮影し、ファイルパスの一覧を screenshots に含めてください
-
-    対応内容:
-    ${summary}
-  `,
-  { agentType: 'webapp-testing', schema: E2E_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} 動作確認` }
+  JSON.stringify({
+    workingDir: worktreePath,
+    description: `以下の対応内容が正しく動作するか検証する:\n${summary}`,
+    serverCommand: null,
+    port: null,
+  }),
+  { agentType: 'e2e-test', schema: E2E_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} 動作確認` }
 )
 
 await agent(
@@ -72,7 +69,7 @@ await agent(
     body: summary,
     screenshots: e2e.screenshots.length ? e2e.screenshots : null,
   }),
-  { agentType: 'comment-pr', phase: 'PR対応', label: `pr #${pr.number} 返信` }
+  { agentType: 'git-pr-comment', phase: 'PR対応', label: `pr #${pr.number} 返信` }
 )
 
 const result = `pr #${pr.number} 対応完了`

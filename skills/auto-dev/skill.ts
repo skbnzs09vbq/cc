@@ -167,7 +167,7 @@ function resolveAutoDevTarget(stillRunning: RunningEntry[]): ResolvedTarget | nu
 
   if (pr) {
     const worktreePath = Skill(
-      'create-worktree',
+      'git-worktree-create',
       `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`,
     )
     return {
@@ -179,7 +179,7 @@ function resolveAutoDevTarget(stillRunning: RunningEntry[]): ResolvedTarget | nu
     }
   }
   if (issue) {
-    const worktreePath = Skill('create-worktree', `issueNumber: ${issue.number}, branch: null`)
+    const worktreePath = Skill('git-worktree-create', `issueNumber: ${issue.number}, branch: null`)
     return {
       scriptPath: SCRIPT_PATHS.issue,
       args: { issue, worktreePath, maxIterations: AUTO_DEV_ISSUE_MAX_ITERATIONS },
@@ -211,7 +211,7 @@ function resolvePrReviewTarget(stillRunning: RunningEntry[]): ResolvedTarget | n
   if (!pr) return null
 
   const worktreePath = Skill(
-    'create-worktree',
+    'git-worktree-create',
     `issueNumber: ${pr.issueNumber}, branch: ${pr.branch}`,
   )
   return {

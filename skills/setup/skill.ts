@@ -225,7 +225,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
       gitignoreCommitConfirmed ??= askUser(
         dedent`
           ${GITIGNORE_PATH}（.claude を除外する設定）がまだコミットされていません
-          このままだと create-worktree が作る worktree はコミット済みの内容からチェックアウトされるため、
+          このままだと git-worktree-create が作る worktree はコミット済みの内容からチェックアウトされるため、
           .claude が ignore されなくなり、誤って .claude ごとコミットされてしまいます
 
           ${GITIGNORE_PATH} をコミットしてよいですか？

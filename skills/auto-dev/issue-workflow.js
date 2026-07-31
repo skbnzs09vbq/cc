@@ -92,19 +92,14 @@ const branch = await agent(
     baseBranch: null,
     workDescription: `実装計画:\n${plan.planContent}`,
   }),
-  { agentType: 'create-branch', schema: BRANCH_SCHEMA, phase: 'ブランチ作成', label: `issue #${issue.number}` }
+  { agentType: 'git-branch-create', schema: BRANCH_SCHEMA, phase: 'ブランチ作成', label: `issue #${issue.number}` }
 )
 
 // ─── Phase 3: 実装 ───────────────────────────────────────────
 phase('実装')
 
 await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    実装計画:
-    ${plan.planContent}
-  `,
+  JSON.stringify({ workingDir: worktreePath, input: plan.planContent }),
   { agentType: 'implement', phase: '実装', label: `issue #${issue.number}` }
 )
 
@@ -123,18 +118,13 @@ for (let i = 0; i < maxIterations; i++) {
       { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} review${i + 1}` }
     ),
     () => agent(
-      dedent`
-        ${WORKDIR_NOTE}
-
-        ${plan.issueId} の実装内容が正しく動作するか、以下の計画をもとに検証してください
-        検証中の要所でスクリーンショットを撮影し、ファイルパスの一覧を screenshots に含めてください
-
-        計画:
-        ${plan.planContent}
-
-        問題があれば clean:false と findings（指摘内容の要約）、問題なしなら clean:true と findings:null を返してください
-      `,
-      { agentType: 'webapp-testing', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${i + 1}` }
+      JSON.stringify({
+        workingDir: worktreePath,
+        description: `${plan.issueId} の実装内容が正しく動作するか、以下の計画をもとに検証する:\n${plan.planContent}`,
+        serverCommand: null,
+        port: null,
+      }),
+      { agentType: 'e2e-test', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${i + 1}` }
     ),
   ])
   lastE2e = e2e
@@ -145,12 +135,7 @@ for (let i = 0; i < maxIterations; i++) {
 
   fixCount++
   await agent(
-    dedent`
-      ${WORKDIR_NOTE}
-
-      指摘事項:
-      ${findings}
-    `,
+    JSON.stringify({ workingDir: worktreePath, input: `指摘事項:\n${findings}` }),
     { agentType: 'implement', phase: 'レビュー・E2E検証', label: `issue #${issue.number} 修正${fixCount}` }
   )
 }
@@ -179,7 +164,7 @@ const pr = await agent(
     workDescription: `実装計画:\n${plan.planContent}`,
     additionalBody: !clean ? `## 既知の指摘\n${findings}` : null,
   }),
-  { agentType: 'create-pr', phase: 'コミット・PR作成', label: `issue #${issue.number} PR作成` }
+  { agentType: 'git-pr-create', phase: 'コミット・PR作成', label: `issue #${issue.number} PR作成` }
 )
 
 const result = `${plan.issueId} 対応完了（PR: ${pr}）`

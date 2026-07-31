@@ -23,6 +23,9 @@
       "quoteStyle": "single"
     }
   },
+  "files": {
+    "ignore": ["skills/auto-dev/*-workflow.js"]
+  },
   "overrides": [
     {
       "include": [
@@ -37,15 +40,6 @@
             "noExplicitAny": "off"
           }
         }
-      }
-    },
-    {
-      "include": ["skills/auto-dev/*-workflow.js"],
-      "linter": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
       }
     }
   ]

@@ -67,19 +67,13 @@ const ITEMS_SCHEMA = {
 phase('仕様・現状把握')
 
 const specResearch = await agent(
-  dedent`
-    Skill("research", "project-wide spec/requirements") を実行し、仕様に関する情報を取得してください
-    取得した内容をそのまま返してください
-  `,
-  { phase: '仕様・現状把握', label: '仕様調査' }
+  'project-wide spec/requirements',
+  { agentType: 'research', phase: '仕様・現状把握', label: '仕様調査' }
 )
 
 const existingIssues = await agent(
-  dedent`
-    .claude/local/project.ts の TARGET_REPO を確認したうえで
-    gh issue list --repo <TARGET_REPO> --state open --json title,body を実行し、結果をそのまま返してください
-  `,
-  { phase: '仕様・現状把握', label: '既存issue確認' }
+  JSON.stringify({ type: null, assigneeOnly: false }),
+  { agentType: 'issue-list', phase: '仕様・現状把握', label: '既存issue確認' }
 )
 
 // ─── Phase 2: 次のissue選定 ─────────────────────────────
@@ -136,11 +130,8 @@ if (items.length === 0) {
 
 if (items.length === 0) {
   const existingPrs = await agent(
-    dedent`
-      .claude/local/project.ts の TARGET_REPO を確認したうえで
-      gh pr list --repo <TARGET_REPO> --state open --json number,title,mergeable,url を実行し、結果をそのまま返してください
-    `,
-    { phase: '次のissue選定', label: '既存PR確認' }
+    JSON.stringify({ assignee: null }),
+    { agentType: 'git-pr-list', phase: '次のissue選定', label: '既存PR確認' }
   )
 
   items = (await agent(
@@ -168,27 +159,13 @@ const created = await pipeline(
 
   (item, _originalItem, index) =>
     agent(
-      dedent`
-        .claude/local/project.ts の TARGET_REPO/ASSIGNEE を確認したうえで、以下の内容で実際に
-        gh issue create を実行してissueを作成してください
-
-        タイトル: [${item.priority}] ${item.title}
-        本文（Markdown）:
-        ## Description
-        ${item.description}
-
-        ## Rationale
-        ${item.rationale}
-
-        ASSIGNEE は --add-assignee <ASSIGNEE> フラグで指定し、作成時にアサインすること
-        本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出すなど安全な方法で実行してください
-        重要: 他のissue作成エージェントが今まさに並行実行中です、一時ファイルのパスはこのissue専用の
-        一意なものにしてください（例: index "${index}" とタイトルのslugをファイル名に含めた
-        scratchpad/issue_body_${index}.md）、scratchpad/issue_body.md のような汎用の共有名は
-        絶対に使わないこと（並行実行中の別エージェントに上書きされる恐れがあります）
-        作成したissueのURLを返してください
-      `,
-      { phase: 'issue作成', label: `作成: ${item.title}` }
+      JSON.stringify({
+        type: null,
+        title: `[${item.priority}] ${item.title}`,
+        body: `## Description\n${item.description}\n\n## Rationale\n${item.rationale}`,
+        tempFilePath: `scratchpad/issue_body_${index}.md`,
+      }),
+      { agentType: 'issue-create', phase: 'issue作成', label: `作成: ${item.title}` }
     ).then((url) => `${item.title}: created (${url})`)
 )
 
