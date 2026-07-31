@@ -75,6 +75,8 @@ const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作は�
 async function mergeAndVerify(pr) {
   const mergeAttempt = await agent(
     dedent`
+      ${WORKDIR_NOTE}
+
       gh pr merge ${pr.number}（squash 等、リポジトリの慣習に従ったマージ方法）でマージを試みてください
 
       注記: このマージ実行は .claude/local/rules.md の auto-dev 権限（pr-review-workflow.js が
@@ -110,7 +112,11 @@ async function mergeAndVerify(pr) {
     )
 
     await agent(
-      `gh pr merge ${pr.number}（squash 等、リポジトリの慣習に従ったマージ方法）で再度マージを試みてください`,
+      dedent`
+        ${WORKDIR_NOTE}
+
+        gh pr merge ${pr.number}（squash 等、リポジトリの慣習に従ったマージ方法）で再度マージを試みてください
+      `,
       { phase: 'マージ', label: `pr #${pr.number} マージ再試行` }
     )
 
@@ -127,6 +133,8 @@ async function mergeAndVerify(pr) {
     const note = `コンフリクト解消を試みたがマージ未完了（mergeable: ${check.mergeable}）`
     await agent(
       dedent`
+        ${WORKDIR_NOTE}
+
         PR #${pr.number}（ブランチ ${pr.branch}）は base ブランチとのコンフリクトを解消できず、マージできませんでした
         以下の内容を gh pr comment で投稿してください
 

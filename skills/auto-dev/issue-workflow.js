@@ -32,7 +32,10 @@ const BRANCH_SCHEMA = {
   type: 'object',
   properties: {
     branchName: { type: 'string' },
-    baseBranch: { type: ['string', 'null'] },
+    baseBranch: {
+      type: ['string', 'null'],
+      description: '実装計画中に分岐元ブランチの明記があればそれを指定する、なければ null',
+    },
   },
   required: ['branchName', 'baseBranch'],
 }
@@ -60,26 +63,6 @@ const E2E_SCHEMA = {
   required: ['clean', 'findings', 'screenshots'],
 }
 
-const SCREENSHOT_NOTE = 'スクリーンショットは gh gist create などで公開 URL を取得し（gh api で raw_url を取得する等）、Markdown 画像として本文に埋め込んでください'
-
-const COMMIT_SCHEMA = {
-  type: 'object',
-  properties: {
-    message: { type: 'string' },
-    body: { type: ['string', 'null'] },
-  },
-  required: ['message', 'body'],
-}
-
-const PR_DRAFT_SCHEMA = {
-  type: 'object',
-  properties: {
-    title: { type: 'string' },
-    description: { type: 'string' },
-  },
-  required: ['title', 'description'],
-}
-
 const { issue, worktreePath, maxIterations } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
@@ -89,11 +72,7 @@ log(`issue #${issue.number} の対応を開始`)
 phase('計画立案')
 
 const plan = await agent(
-  dedent`
-    ${issue.url}
-
-    完了したら issueId と planContent を返してください
-  `,
+  issue.url,
   { agentType: 'plan-issue', schema: PLAN_SCHEMA, phase: '計画立案', label: `issue #${issue.number}` }
 )
 
@@ -108,23 +87,14 @@ phase('ブランチ作成')
 
 const branch = await agent(
   dedent`
+    workingDir: ${worktreePath}
+    branchName: null
+
+    workDescription:
     実装計画:
     ${plan.planContent}
-
-    計画中に分岐元ブランチの明記があればそれを baseBranch に、なければ null にしてください
   `,
-  { agentType: 'create-branch-name', schema: BRANCH_SCHEMA, phase: 'ブランチ作成', label: `issue #${issue.number}` }
-)
-
-await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    ${branch.baseBranch
-      ? `git fetch origin を実行し、git switch -c ${branch.branchName} origin/${branch.baseBranch} でブランチを作成してください`
-      : `git switch -c ${branch.branchName} でブランチを作成してください（起点は既にチェックアウト済みの base ブランチ）`}
-  `,
-  { phase: 'ブランチ作成', label: `issue #${issue.number}` }
+  { agentType: 'create-branch', schema: BRANCH_SCHEMA, phase: 'ブランチ作成', label: `issue #${issue.number}` }
 )
 
 // ─── Phase 3: 実装 ───────────────────────────────────────────
@@ -146,21 +116,9 @@ phase('レビュー・E2E検証')
 let clean = false
 let findings = null
 let lastE2e = null
-let iterations = 0
+let fixCount = 0
 
-while (!clean && iterations < maxIterations) {
-  iterations++
-  if (findings) {
-    await agent(
-      dedent`
-        ${WORKDIR_NOTE}
-
-        指摘事項:
-        ${findings}
-      `,
-      { agentType: 'implement', phase: 'レビュー・E2E検証', label: `issue #${issue.number} 修正${iterations}` }
-    )
-  }
+for (let i = 0; i < maxIterations; i++) {
   const [review, e2e] = await parallel([
     () => agent(
       dedent`
@@ -169,7 +127,7 @@ while (!clean && iterations < maxIterations) {
         引数なしで実行してください
         指摘があれば clean:false と findings（指摘内容の要約）、指摘なしなら clean:true と findings:null を返してください
       `,
-      { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} review${iterations}` }
+      { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} review${i + 1}` }
     ),
     () => agent(
       dedent`
@@ -183,42 +141,37 @@ while (!clean && iterations < maxIterations) {
 
         問題があれば clean:false と findings（指摘内容の要約）、問題なしなら clean:true と findings:null を返してください
       `,
-      { agentType: 'webapp-testing', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${iterations}` }
+      { agentType: 'webapp-testing', schema: E2E_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} e2e${i + 1}` }
     ),
   ])
   lastE2e = e2e
   clean = review.clean && e2e.clean
   findings = [review.findings, e2e.findings].filter(Boolean).join('\n\n') || null
-}
 
-if (!clean && iterations >= maxIterations) {
-  const result = `issue #${issue.number} 最大反復回数達成（完了していない可能性あり）`
-  log(result)
-  return { result }
+  if (clean) break
+
+  fixCount++
+  await agent(
+    dedent`
+      ${WORKDIR_NOTE}
+
+      指摘事項:
+      ${findings}
+    `,
+    { agentType: 'implement', phase: 'レビュー・E2E検証', label: `issue #${issue.number} 修正${fixCount}` }
+  )
 }
 
 // ─── Phase 5: コミット・PR作成 ─────────────────────────────
 phase('コミット・PR作成')
 
-const commit = await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    現在の差分からコミットメッセージを生成してください
-  `,
-  { agentType: 'create-commit-msg', schema: COMMIT_SCHEMA, phase: 'コミット・PR作成', label: `issue #${issue.number} commit` }
-)
 await agent(
   dedent`
-    ${WORKDIR_NOTE}
-
-    git add -A を実行し、以下の内容で git commit してください
-    メッセージに改行・引用符が含まれる可能性があるため、安全な方法（コミットメッセージをファイルに書き出して git commit -F 等）で実行してください
-
-    メッセージ: ${commit.message}
-    ${commit.body ? `本文:\n${commit.body}` : ''}
+    workingDir: ${worktreePath}
+    message: null
+    body: null
   `,
-  { phase: 'コミット・PR作成', label: `issue #${issue.number} commit` }
+  { agentType: 'git-commit', phase: 'コミット・PR作成', label: `issue #${issue.number} commit` }
 )
 await agent(
   dedent`
@@ -229,31 +182,27 @@ await agent(
   { phase: 'コミット・PR作成', label: `issue #${issue.number} push` }
 )
 
-const prDraft = await agent(
-  dedent`
-    実装計画:
-    ${plan.planContent}
-  `,
-  { agentType: 'draft-pr-description', schema: PR_DRAFT_SCHEMA, phase: 'コミット・PR作成', label: `issue #${issue.number} PR文面` }
-)
 const pr = await agent(
   dedent`
-    以下の内容で gh pr create を実行し、作成した PR の URL を返してください
-    body に改行・引用符が含まれる可能性があるため、一時ファイルに書き出して --body-file で渡す等、安全な方法で実行してください
-    body の先頭に "Closes #${issue.number}" を必ず含めてください（後から PR を検知した際に、元の issue との対応を追跡するため）
-    ${lastE2e.screenshots?.length ? SCREENSHOT_NOTE : ''}
-
-    base: ${branch.baseBranch || '.claude/local/project.ts の BASE_BRANCH'}
+    workingDir: ${worktreePath}
     head: ${branch.branchName}
-    title: ${prDraft.title}
+    base: ${branch.baseBranch}
+    title: null
+    description: null
+    closesIssue: ${issue.number}
+    screenshots: ${JSON.stringify(lastE2e.screenshots ?? [])}
 
-    body:
-    Closes #${issue.number}
+    workDescription:
+    実装計画:
+    ${plan.planContent}
 
-    ${prDraft.description}
-    ${lastE2e.screenshots?.length ? `\nスクリーンショット（動作確認時に撮影したもの）:\n${lastE2e.screenshots.join('\n')}` : ''}
+    additionalBody:
+    ${!clean ? dedent`
+      ## 既知の指摘
+      ${findings}
+    ` : 'null'}
   `,
-  { phase: 'コミット・PR作成', label: `issue #${issue.number} PR作成` }
+  { agentType: 'create-pr', phase: 'コミット・PR作成', label: `issue #${issue.number} PR作成` }
 )
 
 const result = `${plan.issueId} 対応完了（PR: ${pr}）`

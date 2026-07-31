@@ -29,15 +29,6 @@ const E2E_SCHEMA = {
 
 const SCREENSHOT_NOTE = 'スクリーンショットは gh gist create などで公開 URL を取得し（gh api で raw_url を取得する等）、Markdown 画像として本文に埋め込んでください'
 
-const COMMIT_SCHEMA = {
-  type: 'object',
-  properties: {
-    message: { type: 'string' },
-    body: { type: ['string', 'null'] },
-  },
-  required: ['message', 'body'],
-}
-
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 const WORKDIR_NOTE = `作業ディレクトリ: ${worktreePath}（git 操作はすべてこのディレクトリ内で行ってください）`
 
@@ -71,25 +62,13 @@ const e2e = await agent(
   { agentType: 'webapp-testing', schema: E2E_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} 動作確認` }
 )
 
-const commit = await agent(
-  dedent`
-    ${WORKDIR_NOTE}
-
-    現在の差分からコミットメッセージを生成してください
-  `,
-  { agentType: 'create-commit-msg', schema: COMMIT_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} commit` }
-)
 await agent(
   dedent`
-    ${WORKDIR_NOTE}
-
-    git add -A を実行し、以下の内容で git commit してください
-    メッセージに改行・引用符が含まれる可能性があるため（コミットメッセージをファイルに書き出して git commit -F 等）
-
-    メッセージ: ${commit.message}
-    ${commit.body ? `本文:\n${commit.body}` : ''}
+    workingDir: ${worktreePath}
+    message: null
+    body: null
   `,
-  { phase: 'PR対応', label: `pr #${pr.number} commit` }
+  { agentType: 'git-commit', phase: 'PR対応', label: `pr #${pr.number} commit` }
 )
 await agent(
   dedent`
@@ -101,8 +80,11 @@ await agent(
 )
 await agent(
   dedent`
+    ${WORKDIR_NOTE}
+
     gh pr comment ${pr.number} で、以下の対応内容をまとめて PR に返信してください
     本文に改行・引用符が含まれる可能性があるため、一時ファイルに書き出して --body-file で渡す等で実行してください
+    他PRのworkflowが並行実行中の可能性があるため、一時ファイルは共有スクラッチパッドではなく worktree内（例: ${worktreePath}/.pr_comment.md）に書き出すこと
     ${e2e.screenshots.length ? SCREENSHOT_NOTE : ''}
 
     対応内容:

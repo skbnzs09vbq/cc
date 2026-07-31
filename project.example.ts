@@ -7,7 +7,7 @@ export const TARGET_REPO = 'https://github.com/<org>/<repo>'
 export const ASSIGNEE = '<github-user-id>'
 
 /** チケット ID の接頭辞 */
-export const TICKET_PREFIX = 'XXX'
+export const TICKET_PREFIX = 'issue'
 
 /** ブランチの分岐元・PR のベースブランチ */
 export const BASE_BRANCH = 'main'
