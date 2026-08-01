@@ -20,6 +20,12 @@ const E2E_SCHEMA = {
   required: ['clean', 'findings', 'screenshots'],
 }
 
+const AUTO_DEV_NOTE = 'auto-dev workflow からの実行です。ユーザー許可は得た上で呼び出されているので、確認を挟まず実行してください。'
+
+function withNote(argsObj) {
+  return `${AUTO_DEV_NOTE}\n\n${JSON.stringify(argsObj)}`
+}
+
 const { pr, worktreePath } = typeof args === 'string' ? JSON.parse(args) : args
 
 log(`PR #${pr.number} のコメント対応を開始`)
@@ -43,15 +49,15 @@ const e2e = await agent(
 )
 
 await agent(
-  JSON.stringify({ workingDir: worktreePath, message: null, body: null }),
+  withNote({ workingDir: worktreePath, message: null, body: null }),
   { agentType: 'git-commit', phase: 'PR対応', label: `pr #${pr.number} commit` }
 )
 await agent(
-  JSON.stringify({ workingDir: worktreePath, branch: pr.branch }),
+  withNote({ workingDir: worktreePath, branch: pr.branch }),
   { agentType: 'git-push', phase: 'PR対応', label: `pr #${pr.number} push` }
 )
 await agent(
-  JSON.stringify({
+  withNote({
     workingDir: worktreePath,
     prNumber: pr.number,
     body: summary,

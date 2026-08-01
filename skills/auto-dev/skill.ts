@@ -130,7 +130,10 @@ export function autoDev(): void {
 
   const allPrs = gitPrList({ assignee: null, number: null, state: "all" });
   const issuesWithExistingPr = new Set(
-    allPrs.map((pr) => pr.closesIssue).filter((n): n is number => n !== null),
+    allPrs
+      .filter((pr) => pr.state === "OPEN")
+      .map((pr) => pr.closesIssue)
+      .filter((n): n is number => n !== null),
   );
   const openPrs = allPrs.filter(
     (pr) => pr.state === "OPEN" && pr.author.login === ASSIGNEE,
