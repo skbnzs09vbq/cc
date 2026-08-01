@@ -22,16 +22,18 @@ const CANDIDATE_SCHEMA = {
   required: ['message'],
 } as const satisfies Schema
 
-export function gitCommitMessage(): string {
+export function gitCommitMessage(workingDir?: string): string {
   remember(['git commit は実行しないこと'])
 
   // ─── Phase 1: コンテキスト取得 ─────────────────────────────
   phase('コンテキスト取得')
 
-  const branch = runCommand(['git rev-parse --abbrev-ref HEAD'])
+  const cd = workingDir ? `cd ${workingDir} && ` : ''
 
-  let diff = runCommand(['git diff --cached'])
-  if (!diff || !diff.trim()) diff = runCommand(['git diff HEAD'])
+  const branch = runCommand([`${cd}git rev-parse --abbrev-ref HEAD`])
+
+  let diff = runCommand([`${cd}git diff --cached`])
+  if (!diff || !diff.trim()) diff = runCommand([`${cd}git diff HEAD`])
 
   // ─── Phase 2: 候補生成 ─────────────────────────────────────
   phase('候補生成')

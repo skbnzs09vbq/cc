@@ -24,6 +24,7 @@ import {
 const CRON_PROMPT =
   "auto-dev スキルを実行してください\n前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと";
 const STATE_PATH = ".claude/local/running-workflows.json";
+const DIRECTION_MAX_OPEN_ISSUES = 5;
 
 type WorkflowType = "issue" | "pr-comment" | "pr-review" | "direction";
 type Priority = "high" | "middle" | "low";
@@ -195,60 +196,59 @@ export function autoDev(): void {
     worktreePath: string | null;
   } | null = null;
 
-  if (filteredIssues.length === 0) {
-    if (runningDirectionCount === 0) {
-      launched = {
-        type: "direction",
-        scriptPath: SCRIPT_PATHS.direction,
-        args: undefined,
-        target: "direction 生成",
-        worktreePath: null,
-      };
-    }
-  } else {
-    const highReadyPr = filteredPrs.find(
-      (pr) => pr.priority === "high" && isReady(pr),
-    );
-    const anyHighPr = filteredPrs.some((pr) => pr.priority === "high");
-    const readyPr = filteredPrs.find(isReady);
-    const unresolvedPr = [...filteredPrs]
-      .filter((pr) => pr.hasComments && !pr.allResolved)
-      .sort(
-        (a, b) =>
-          (a.priority === "high" ? -1 : 1) - (b.priority === "high" ? -1 : 1),
-      )[0];
+  const highReadyPr = filteredPrs.find(
+    (pr) => pr.priority === "high" && isReady(pr),
+  );
+  const anyHighPr = filteredPrs.some((pr) => pr.priority === "high");
+  const readyPr = filteredPrs.find(isReady);
+  const unresolvedPr = [...filteredPrs]
+    .filter((pr) => pr.hasComments && !pr.allResolved)
+    .sort(
+      (a, b) =>
+        (a.priority === "high" ? -1 : 1) - (b.priority === "high" ? -1 : 1),
+    )[0];
 
-    if (highReadyPr) {
-      launched = launchPr(highReadyPr, "pr-review");
-    } else if (!anyHighPr && readyPr) {
-      launched = launchPr(readyPr, "pr-review");
-    } else if (unresolvedPr) {
-      launched = launchPr(unresolvedPr, "pr-comment");
-    } else {
-      const issue =
-        filteredIssues.find((i) => i.priority === "high") ?? filteredIssues[0];
-      const worktreePath = gitWorktreeCreate({
-        issueNumber: issue.number,
-        branch: null,
-      });
-      launched = {
-        type: "issue",
-        scriptPath: SCRIPT_PATHS.issue,
-        args: {
-          issue: {
-            number: issue.number,
-            url: issue.url,
-            title: issue.title,
-            blocked: false,
-            blockedReason: null,
-          },
-          worktreePath,
-          maxIterations: AUTO_DEV_ISSUE_MAX_ITERATIONS,
+  if (highReadyPr) {
+    launched = launchPr(highReadyPr, "pr-review");
+  } else if (!anyHighPr && readyPr) {
+    launched = launchPr(readyPr, "pr-review");
+  } else if (unresolvedPr) {
+    launched = launchPr(unresolvedPr, "pr-comment");
+  } else if (filteredIssues.length > 0) {
+    const issue =
+      filteredIssues.find((i) => i.priority === "high") ?? filteredIssues[0];
+    const worktreePath = gitWorktreeCreate({
+      issueNumber: issue.number,
+      branch: null,
+    });
+    launched = {
+      type: "issue",
+      scriptPath: SCRIPT_PATHS.issue,
+      args: {
+        issue: {
+          number: issue.number,
+          url: issue.url,
+          title: issue.title,
+          blocked: false,
+          blockedReason: null,
         },
-        target: `issue #${issue.number}`,
         worktreePath,
-      };
-    }
+        maxIterations: AUTO_DEV_ISSUE_MAX_ITERATIONS,
+      },
+      target: `issue #${issue.number}`,
+      worktreePath,
+    };
+  } else if (
+    runningDirectionCount === 0 &&
+    openIssues.length < DIRECTION_MAX_OPEN_ISSUES
+  ) {
+    launched = {
+      type: "direction",
+      scriptPath: SCRIPT_PATHS.direction,
+      args: undefined,
+      target: "direction 生成",
+      worktreePath: null,
+    };
   }
 
   if (!launched) {

@@ -1,7 +1,5 @@
 # Rules
 
-**`.claude/local/rules.md` があれば、その内容をこのファイルより必ず優先する。** 以降の各セクション（GitHub 操作・Slack 等）の内容を根拠に判断・行動する際は、その都度 `.claude/local/rules.md` に同じ見出しがないか確認し、あれば必ずそちらを先に適用すること（冒頭で一度読んだだけで満たしたことにしない）
-
 ## project 固有情報の扱い（最優先の禁止事項）
 
 - project 固有の情報（project.ts の実値、guidelines.md、pr-review-patterns.md、tasks/ 配下の作業ファイル、commands.md 等）は必ず `.claude/local/` 配下に置く
@@ -22,6 +20,12 @@ CLAUDE.md 内に、具体的なファイル名・ツール名・値などプロ�
 - ユーザーの許可なく PR に加筆・編集・コメントを行わないこと
 - 担当者（`ASSIGNEE`）以外のアカウントが担当する PR に対して、read 以外の操作（編集・コメント・マージ等）を行わないこと。`ASSIGNEE` の値は `.claude/local/project.ts` を参照する
 - PR のマージは絶対に行わないこと（担当者・権限問わず）
+- **例外（auto-dev workflow）**: `.claude/skills/auto-dev/*-workflow.js` から起動された agent 呼び出しは自律実行が前提のため、上記の許可確認を待たず以下を行ってよい
+    - `git commit` / `git push`
+    - PR の作成
+    - PR への加筆・編集・コメント
+    - `pr-review-workflow.js` が自身の判断で行う PR のマージ
+  （`git switch` によるブランチ切り替えも、実行中の workflow の判断に任せてよい）
 
 ## Slack
 

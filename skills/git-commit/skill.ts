@@ -2,6 +2,7 @@ import { getArgs } from '../_shared/args.js'
 import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
+import { gitCommitMessage } from '../git-commit-message/skill.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -18,7 +19,7 @@ export function gitCommit(args: Infer<typeof ARGS_SCHEMA>): string {
   let { message, body } = args
 
   if (!message) {
-    const candidates = Skill('git-commit-message')
+    const candidates = gitCommitMessage(workingDir)
     const picked = complete(
       dedent`
         以下の候補から最も適切な1つを選んでください

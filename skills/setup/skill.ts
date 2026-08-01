@@ -15,9 +15,6 @@ import { dedent } from '../_shared/utils.js'
 const TEMPLATE_PATH = '.claude/project.example.ts'
 const OUTPUT_PATH = '.claude/local/project.ts'
 
-const AUTO_DEV_TEMPLATE_PATH = '.claude/rules.auto-dev.example.md'
-const RULES_PATH = '.claude/local/rules.md'
-
 const ARGS_SCHEMA = {
   type: 'object',
   properties: {
@@ -155,29 +152,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
 
   respond(`${OUTPUT_PATH} を更新しました（対象: ${Object.keys(finalValues).join(', ') || 'なし'}）`)
 
-  // ─── Phase 3: auto-dev の有効化 ─────────────────────────────
-  phase('auto-dev の有効化')
-
-  if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
-    const rulesContent = readFile(RULES_PATH)
-    const autoDevTemplate = readFile(AUTO_DEV_TEMPLATE_PATH)
-    const merged = rulesContent
-      ? generate(dedent`
-          以下の既存内容に、次のテンプレート内容を追記してください
-          既存内容に同じ見出し（例: "## GitHub 操作"）が既にあれば、新規見出しを作らずそのセクション内に自然に統合する
-
-          既存内容:
-          ${rulesContent}
-
-          追記するテンプレート:
-          ${autoDevTemplate}
-        `)
-      : (autoDevTemplate as string)
-    writeFile(RULES_PATH, merged)
-    respond(`${RULES_PATH} に auto-dev 用ルールを追加しました`)
-  }
-
-  // ─── Phase 4: .gitignore の確認 ─────────────────────────────
+  // ─── Phase 3: .gitignore の確認 ─────────────────────────────
   phase('.gitignoreの確認')
 
   if (/USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
@@ -270,7 +245,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
     }
   }
 
-  // ─── Phase 5: .claude のgit管理方針 ───────────────────────────
+  // ─── Phase 4: .claude のgit管理方針 ───────────────────────────
   phase('.claudeのgit管理方針')
 
   const CLAUDE_IS_GIT =
@@ -310,7 +285,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
     }
   }
 
-  // ─── Phase 6: VS Codeフォーマッタ設定 ───────────────────────
+  // ─── Phase 5: VS Codeフォーマッタ設定 ───────────────────────
   phase('VS Codeフォーマッタ設定')
 
   const hasBiomeConfig =
@@ -356,7 +331,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
     }
   }
 
-  // ─── Phase 7: 初回コミット確認 ───────────────────────────────
+  // ─── Phase 6: 初回コミット確認 ───────────────────────────────
   phase('初回コミット確認')
 
   if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
@@ -396,7 +371,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
     }
   }
 
-  // ─── Phase 8: 案内 ─────────────────────────────────────────
+  // ─── Phase 7: 案内 ─────────────────────────────────────────
   phase('案内')
 
   if (/USE_AUTO_DEV\s*=\s*true/.test(newContent))
