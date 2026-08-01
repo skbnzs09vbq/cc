@@ -1,4 +1,5 @@
 import { BASE_BRANCH, ISSUE_TEMPLATE } from '../../local/project.js'
+import { research } from '../research/skill.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -81,7 +82,7 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
     ${input}
   `)
 
-  const researchResult = Skill('research', researchTopic)
+  const researchResult = research(researchTopic)
 
   // ─── Phase 3: 実装状況の確認 ───────────────────────────────
   phase('実装状況の確認')

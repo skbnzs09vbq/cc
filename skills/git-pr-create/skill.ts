@@ -1,4 +1,5 @@
 import { BASE_BRANCH, TARGET_REPO } from '../../local/project.js'
+import { gitPrDraft } from '../git-pr-draft/skill.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
@@ -62,7 +63,7 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
   let { title, description } = args
 
   if (!title || !description) {
-    const draft = Skill('git-pr-draft', workDescription)
+    const draft = gitPrDraft(workDescription ?? '')
     const picked = complete(
       dedent`
         以下は PR タイトル・description の下書きです\nこの内容をそのまま採用してください

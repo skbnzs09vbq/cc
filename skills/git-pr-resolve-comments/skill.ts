@@ -1,5 +1,6 @@
 import { TARGET_REPO } from '../../local/project.js'
 import { gitPrCommentsList } from '../git-pr-comments-list/skill.js'
+import { implement } from '../implement/skill.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -132,10 +133,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
         } as const)
 
     addressedItems = items.filter((_, i) => !excludeNumbers.includes(i + 1))
-    Skill(
-      'implement',
-      JSON.stringify({ workingDir, input: addressedItems.map(itemText).join('\n\n') }),
-    )
+    implement({ workingDir, input: addressedItems.map(itemText).join('\n\n') })
 
     for (const item of addressedItems) {
       if (item.id)
@@ -151,7 +149,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
       let proceed = false
 
       while (!proceed) {
-        Skill('implement', JSON.stringify({ workingDir, input: text }))
+        implement({ workingDir, input: text })
 
         if (items[i].id)
           runCommand([

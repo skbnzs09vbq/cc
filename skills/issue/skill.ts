@@ -1,17 +1,12 @@
 import { gitBranchName } from '../git-branch-name/skill.js'
+import { implement } from '../implement/skill.js'
+import { planIssue } from '../plan-issue/skill.js'
+import { reviewDiff } from '../review-diff/skill.js'
+import { testE2e } from '../test-e2e/skill.js'
 import { BASE_BRANCH } from '../../local/project.js'
 import { parseArgs } from '../_shared/args.js'
 import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
-
-const PLAN_RESULT_SCHEMA = {
-  type: 'object',
-  properties: {
-    issueId: { type: 'string' },
-    planContent: { type: 'string' },
-  },
-  required: ['issueId', 'planContent'],
-} as const satisfies Schema
 
 const BASE_BRANCH_SCHEMA = {
   type: 'object',
@@ -34,12 +29,7 @@ export function issue(issueInput: string): string {
   // ─── Phase 1: 計画立案 ─────────────────────────────────────────
   phase('計画立案')
 
-  const planResult: string = Skill('plan-issue', issueInput)
-
-  const plan = complete(
-    `以下の plan-issue の結果から issueId・planContent を抽出してください\n\n\n${planResult}`,
-    PLAN_RESULT_SCHEMA,
-  )
+  const plan = planIssue({ issueInput, shouldContinue: null })
 
   // ─── Phase 2: ブランチ作成 ───────────────────────────────────
   phase('ブランチ作成')
@@ -63,33 +53,27 @@ export function issue(issueInput: string): string {
   // ─── Phase 3: 実装 ──────────────────────────────────────────────
   phase('実装')
 
-  Skill('implement', plan.planContent)
+  implement({ workingDir: null, input: plan.planContent })
 
   // ─── Phase 4: 自己レビュー・E2E 検証（両方問題なくなるまで繰り返す） ─
   phase('自己レビュー・E2E検証')
 
   let clean = false
   while (!clean) {
-    const reviewResult: { clean: boolean; findings: string | null } = Skill(
-      'review-diff',
-      JSON.stringify({ workingDir: '.', mode: 'check' }),
-    )
+    const reviewResult = reviewDiff('.', 'check')
 
-    const e2eResult: { clean: boolean; findings: string | null } = Skill(
-      'test-e2e',
-      JSON.stringify({
-        workingDir: '.',
-        description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する`,
-        serverCommand: null,
-        port: null,
-      }),
-    )
+    const e2eResult = testE2e({
+      workingDir: '.',
+      description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する`,
+      serverCommand: null,
+      port: null,
+    })
 
     clean = reviewResult.clean && e2eResult.clean
 
     if (!clean) {
       const findings = [reviewResult.findings, e2eResult.findings].filter(Boolean).join('\n\n')
-      Skill('implement', findings)
+      implement({ workingDir: null, input: findings })
     }
   }
 

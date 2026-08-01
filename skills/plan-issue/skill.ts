@@ -8,6 +8,8 @@ import {
   TASK_DIR,
   TYPES,
 } from '../../local/project.js'
+import { grillMe } from '../grill-me/skill.js'
+import { research } from '../research/skill.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -143,7 +145,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     if (!shouldContinue) exit('重複する PR がある可能性があるため、計画立案を中止しました')
   }
 
-  const relatedContext = Skill('research', `"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
+  const relatedContext = research(`"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
 
   const codeResult = generate(
     buildCommandPrompt(
@@ -254,7 +256,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     { type: 'boolean' } as const,
   )
 
-  if (isComplex) planContent = Skill('grill-me', planContent)
+  if (isComplex) planContent = grillMe(planContent)
 
   // ─── Phase 6: 計画を作成して提示する ───────────────────────────
   phase('計画を作成して提示する')
