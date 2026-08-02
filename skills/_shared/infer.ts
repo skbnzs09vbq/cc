@@ -44,11 +44,6 @@ type InferByType<S extends Schema> = S['type'] extends readonly JsonType[]
     ? InferSingle<S, S['type']>
     : any
 
-/**
- * Schema（`: Schema` で明示annotationせず `as const satisfies Schema` で定義したもの）から、
- * 対応する TS の型を再構成する\nrequired に無いキーは optional になる
- * enum があれば type ではなく enum の要素のリテラルunion型を優先する
- */
 export type Infer<S extends Schema> = S['enum'] extends readonly any[]
   ? S['enum'][number]
   : InferByType<S>

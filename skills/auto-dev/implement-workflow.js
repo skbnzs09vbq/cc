@@ -81,8 +81,8 @@ const plan = await agent(
   { agentType: 'plan-issue', schema: PLAN_SCHEMA, phase: '計画立案', label: `issue #${issue.number}` }
 )
 
-if (plan.aborted) {
-  const result = `issue #${issue.number} 中止: ${plan.reason}`
+if (plan.aborted || !plan.planContent) {
+  const result = `issue #${issue.number} 中止: ${plan.reason ?? '計画内容が空でした（planContent なし）'}`
   log(result)
   return { result }
 }
@@ -119,7 +119,7 @@ let fixCount = 0
 for (let i = 0; i < maxIterations; i++) {
   const [review, e2e] = await parallel([
     () => agent(
-      JSON.stringify({ workingDir: worktreePath, mode: 'check' }),
+      JSON.stringify({ workingDir: worktreePath }),
       { agentType: 'review-diff', schema: CHECK_SCHEMA, phase: 'レビュー・E2E検証', label: `issue #${issue.number} review${i + 1}` }
     ),
     () => agent(

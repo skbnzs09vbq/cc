@@ -6,52 +6,26 @@ import {
   MONOREPO_APPS_DIR,
   PR_PATTERNS,
   TAILWIND_CHECK,
-  TARGET_REPO,
   TYPECHECK_COMMAND,
 } from '../../local/project.js'
+import { checkTailwind } from '../check-tailwind/skill.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
   buildCommandPrompt,
   complete,
-  remember,
   respond,
   runCommand,
-  writeFile,
 } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
-
-const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
 
 export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
     workingDir: { type: 'string', description: 'レビュー対象の作業ディレクトリ' },
-    mode: {
-      type: 'string',
-      enum: ['update', 'check'],
-      description: 'パターン集を更新する場合は update、差分をチェックする場合は check',
-    },
   },
-  required: ['workingDir', 'mode'],
-} as const satisfies Schema
-
-const CLASSIFIED_SCHEMA = {
-  type: 'object',
-  properties: {
-    aiReview: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'AI レビューのコメント（要約可）',
-    },
-    humanReview: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'ヒューマンレビューのコメント（要約可）',
-    },
-  },
-  required: ['aiReview', 'humanReview'],
+  required: ['workingDir'],
 } as const satisfies Schema
 
 const CHECK_RESULT_SCHEMA = {
@@ -67,99 +41,7 @@ const CHECK_RESULT_SCHEMA = {
   required: ['clean', 'findings'],
 } as const satisfies Schema
 
-function updatePatterns(workingDir: string): string {
-  remember(['gh コマンドの実行前にユーザーへの確認は不要'])
-
-  // ─── Phase 1: PR 一覧取得 ─────────────────────────────────
-  phase('PR一覧取得')
-
-  const prList = runCommand([
-    `gh pr list --repo ${REPO} --state all --json number,title,state --limit 50`,
-  ])
-
-  // ─── Phase 2: コメント収集 ─────────────────────────────────
-  phase('コメント収集')
-
-  const allComments = complete(
-    dedent`
-      以下の PR 一覧に含まれる各 PR について、次の2コマンドを実行してコメント・レビューを収集してください
-
-        gh api repos/${REPO}/pulls/<number>/comments
-        gh api repos/${REPO}/pulls/<number>/reviews
-
-      PR 一覧:
-      ${prList}
-
-      収集した全コメント・レビューを、どの PR・どのコメントかが分かる形でまとめて返してください
-    `,
-  )
-
-  // ─── Phase 3: 投稿者種別で分類 ───────────────────────────────
-  phase('コメント分類')
-
-  const classified = complete(
-    dedent`
-      以下のコメント・レビューを投稿者の種別で分類してください
-
-      - AI レビュー: ユーザー名が "[bot]" で終わる自動レビューツールの投稿
-      - ヒューマンレビュー: それ以外の投稿者
-
-      コメント・レビュー:
-      ${allComments}
-    `,
-    CLASSIFIED_SCHEMA,
-  )
-
-  // ─── Phase 4: パターン集の更新 ───────────────────────────────
-  phase('パターン集更新')
-
-  const currentPatterns = runCommand([
-    `cd ${workingDir} && cat ${PR_PATTERNS} 2>/dev/null || echo ""`,
-  ])
-
-  const updatedPatterns = complete(
-    dedent`
-      既存のパターン集と、分類済みの PR コメント・レビューを照合し、パターン集を更新してください
-      構造（AI / ヒューマン の2大セクション → カテゴリ番号・見出し形式）は維持してください
-
-      - 既存カテゴリに追加すべき新しい具体例があれば、既存カテゴリに追記する
-      - 新規カテゴリとして追加すべき指摘があれば、新カテゴリを追加する
-        ただし1件しか確認されていない指摘は昇格させず、2件以上確認された、または重要度 HIGH/CRITICAL の場合のみ追加する
-      - 過去のパターンで現在は修正済み・廃止された観点があれば、削除またはコメントアウトする
-      - ファイル冒頭の「最終更新」日付を今日の日付と対象 PR 範囲（例: #12-#48）に更新する
-
-      既存パターン集（${PR_PATTERNS}、存在しない場合は新規作成）:
-      ${currentPatterns || '(なし・新規作成)'}
-
-      AI レビューのコメント:
-      ${JSON.stringify(classified.aiReview)}
-
-      ヒューマンレビューのコメント:
-      ${JSON.stringify(classified.humanReview)}
-
-      更新後の ${PR_PATTERNS} の全文を返してください
-    `,
-  )
-
-  writeFile(`${workingDir}/${PR_PATTERNS}`, updatedPatterns)
-
-  // ─── Phase 5: 報告 ───────────────────────────────────────────
-  phase('報告')
-
-  return complete(
-    dedent`
-      以下の更新前後のパターン集の差分を、追加・変更・削除に分けて要約してください
-
-      更新前:
-      ${currentPatterns || '(なし)'}
-
-      更新後:
-      ${updatedPatterns}
-    `,
-  )
-}
-
-function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
+export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
   // ─── Phase 1: 前提ファイルの確認 ─────────────────────────────
   phase('前提ファイル確認')
 
@@ -208,38 +90,28 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
           ),
         ]
 
-  const typecheckResults = workspaces.map((workspace) => ({
-    workspace,
-    result: runCommand([
-      dedent`
-      cd ${workingDir}/${MONOREPO_APPS_DIR}/${workspace}
-      FILES=$(git -C ../.. diff --name-only --diff-filter=ACMR ${BASE_BRANCH}...HEAD | sed -n 's|^${MONOREPO_APPS_DIR}/${workspace}/||p')
-      ${TYPECHECK_COMMAND} 2>&1 | grep -F -f <(printf '%s\\n' "$FILES") || echo "変更ファイルに型エラーなし"
-    `,
-    ]),
-  }))
+  const typecheckResults = workspaces.map((workspace) => {
+    const prefix = MONOREPO_APPS_DIR === '' ? '' : `${MONOREPO_APPS_DIR}/${workspace}/`
+    const workspaceFiles = prefix
+      ? changedFiles.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length))
+      : changedFiles
+    const filesArg = workspaceFiles.map((f) => `"${f}"`).join(' ')
+
+    return {
+      workspace,
+      result: runCommand([
+        dedent`
+        cd ${workingDir}/${MONOREPO_APPS_DIR}/${workspace}
+        ${TYPECHECK_COMMAND} 2>&1 | grep -F -f <(printf '%s\\n' ${filesArg}) || echo "変更ファイルに型エラーなし"
+      `,
+      ]),
+    }
+  })
 
   // ─── Phase 5: Tailwind arbitrary value チェック ─────────────
   phase('Tailwindチェック')
 
-  let tailwindResult = null
-  if (TAILWIND_CHECK) {
-    tailwindResult = runCommand([
-      dedent`
-      cd ${workingDir}
-      git diff ${BASE_BRANCH}...HEAD -- '*.ts' '*.tsx' | grep '^+' | node -e '
-      const px = /\\b(w|h|p[xytrbl]?|m[xytrbl]?|gap(?:-[xy])?|size|top|bottom|left|right|inset(?:-[xy])?|min-[wh]|max-[wh]|space-[xy])-\\[(\\d+)px\\]/g;
-      const aspect = /\\baspect-\\[(\\d+)\\/(\\d+)\\]/g;
-      let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
-        const found = new Map();
-        for (const m of s.matchAll(px)) { const v = Number((+m[2] / 4).toFixed(4)); found.set(m[0], \`\${m[1]}-\${v}\`); }
-        for (const m of s.matchAll(aspect)) found.set(m[0], \`aspect-\${m[1]}/\${m[2]}\`);
-        if (found.size === 0) console.log("Tailwind arbitrary value: 指摘なし ✓");
-        else for (const [k, v] of found) console.log(\`\${k} → \${v}\`);
-      });'
-    `,
-    ])
-  }
+  const tailwindResult = TAILWIND_CHECK ? checkTailwind({ workingDir }) : null
 
   // ─── Phase 6: パターン集・指針との照合 ───────────────────────
   phase('パターン集・指針照合')
@@ -311,9 +183,7 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
   return complete(
     dedent`
       以下の各チェック結果を判定してください
-      該当する問題を1件でも発見したら clean:false とし、findings に出力フォーマットのテンプレートに従って
-      整形した指摘内容（パターン違反・指針違反・code-review 指摘を1件ずつ）を入れてください
-      問題がゼロなら clean:true, findings:null としてください
+      findings は出力フォーマットのテンプレートに従って、パターン違反・指針違反・code-review 指摘を1件ずつ整形してください
 
       lint エラー: ${lintResult || 'なし'}
 
@@ -334,14 +204,4 @@ function checkDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
   )
 }
 
-export function reviewDiff<M extends 'update' | 'check'>(
-  workingDir: string,
-  mode: M,
-): M extends 'update' ? string : Infer<typeof CHECK_RESULT_SCHEMA> {
-  return (
-    mode === 'update' ? updatePatterns(workingDir) : checkDiff(workingDir)
-  ) as M extends 'update' ? string : Infer<typeof CHECK_RESULT_SCHEMA>
-}
-
-const args = getArgs(ARGS_SCHEMA)
-respond(reviewDiff(args.workingDir, args.mode))
+respond(reviewDiff(getArgs(ARGS_SCHEMA).workingDir))

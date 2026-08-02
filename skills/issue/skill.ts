@@ -31,6 +31,10 @@ export function issue(issueInput: string): string {
 
   const plan = planIssue({ issueInput, shouldContinue: null })
 
+  if (plan.aborted || !plan.planContent) {
+    return `計画立案を中止しました: ${plan.reason ?? '計画内容が空でした（planContent なし）'}`
+  }
+
   // ─── Phase 2: ブランチ作成 ───────────────────────────────────
   phase('ブランチ作成')
 
@@ -38,8 +42,6 @@ export function issue(issueInput: string): string {
 
   const { baseBranch } = complete(
     dedent`
-      以下の実装計画に分岐元として明記されているブランチがあれば baseBranch に、なければ null を返してください
-
       実装計画:
       ${plan.planContent}
     `,
@@ -60,7 +62,7 @@ export function issue(issueInput: string): string {
 
   let clean = false
   while (!clean) {
-    const reviewResult = reviewDiff('.', 'check')
+    const reviewResult = reviewDiff('.')
 
     const e2eResult = testE2e({
       workingDir: '.',

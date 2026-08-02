@@ -1,4 +1,3 @@
-import { TARGET_REPO } from '../../local/project.js'
 import { gitPrCommentsList } from '../git-pr-comments-list/skill.js'
 import { implement } from '../implement/skill.js'
 import { getArgs } from '../_shared/args.js'
@@ -11,10 +10,9 @@ import {
   respond,
   runCommand,
 } from '../_shared/complete.js'
+import { REPO } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
-
-const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
 
 const REVIEW_ITEM_SCHEMA = {
   type: 'array',
@@ -77,7 +75,6 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   const items = complete(
     dedent`
       以下のレビューコメント・レビュー本文それぞれについて、id・原文・内容の要約・妥当性の評価を抽出してください
-      id はレビューコメント側にのみ含まれる元の id をそのまま使う（レビュー本文由来の項目は null）
 
       レビューコメント:
       ${reviewComments}

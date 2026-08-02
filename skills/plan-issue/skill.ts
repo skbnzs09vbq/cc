@@ -16,7 +16,6 @@ import {
   askUser,
   buildCommandPrompt,
   complete,
-  exit,
   generate,
   readFile,
   respond,
@@ -97,8 +96,10 @@ export const ARGS_SCHEMA = {
 } as const satisfies Schema
 
 export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
-  issueId: string
-  planContent: string
+  aborted: boolean
+  reason: string | null
+  issueId: string | null
+  planContent: string | null
 } {
   const { issueInput } = args
   let { shouldContinue } = args
@@ -142,7 +143,13 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
       `,
       { type: 'boolean' } as const,
     )
-    if (!shouldContinue) exit('重複する PR がある可能性があるため、計画立案を中止しました')
+    if (!shouldContinue)
+      return {
+        aborted: true,
+        reason: `重複する PR がある可能性があるため、計画立案を中止しました\n${(prCheck.prs ?? []).join('\n')}`,
+        issueId: null,
+        planContent: null,
+      }
   }
 
   const relatedContext = research(`"${issueLabel}" と重複・関連しそうな既存タスク・議論`)
@@ -291,7 +298,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     }
   }
 
-  return { issueId, planContent }
+  return { aborted: false, reason: null, issueId, planContent }
 }
 
 respond(planIssue(getArgs(ARGS_SCHEMA)))

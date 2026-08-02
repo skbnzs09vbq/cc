@@ -71,7 +71,6 @@ export function gitPrDraft(supplement: string): string {
       - 概要: ${PR_LANG} で簡潔に、「何を」「どうした」かが diff から分かるように書く
 
       ## description
-      以下のテンプレートのセクション構成・HTML コメントを削除せず、内容だけを埋めて出力してください
       テンプレート:
       ${template || '(テンプレートが取得できなかった場合は一般的な PR description 構成で生成する)'}
 

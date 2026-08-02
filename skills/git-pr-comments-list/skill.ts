@@ -1,9 +1,7 @@
-import { TARGET_REPO } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, respond, runCommand } from '../_shared/complete.js'
+import { REPO } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
-
-const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
 
 export const ARGS_SCHEMA = {
   type: 'object',

@@ -24,16 +24,16 @@ import {
 const CRON_PROMPT =
   "auto-dev スキルを実行してください\n前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと";
 const STATE_PATH = ".claude/local/running-workflows.json";
-const DIRECTION_MAX_OPEN_ISSUES = 5;
+const ROADMAP_MAX_OPEN_ISSUES = 5;
 
-type WorkflowType = "issue" | "pr-comment" | "pr-review" | "direction";
+type WorkflowType = "implement" | "address-comments" | "review" | "roadmap";
 type Priority = "high" | "middle" | "low";
 
 const SCRIPT_PATHS: Record<WorkflowType, string> = {
-  issue: ".claude/skills/auto-dev/issue-workflow.js",
-  "pr-comment": ".claude/skills/auto-dev/pr-comment-workflow.js",
-  "pr-review": ".claude/skills/auto-dev/pr-review-workflow.js",
-  direction: ".claude/skills/auto-dev/direction-workflow.js",
+  implement: ".claude/skills/auto-dev/implement-workflow.js",
+  "address-comments": ".claude/skills/auto-dev/address-comments-workflow.js",
+  review: ".claude/skills/auto-dev/review-workflow.js",
+  roadmap: ".claude/skills/auto-dev/roadmap-workflow.js",
 };
 
 type RunningEntry = {
@@ -117,8 +117,8 @@ export function autoDev(): void {
       .map((entry) => Number(entry.target.match(/issue #(\d+)/)?.[1]))
       .filter((n) => !Number.isNaN(n)),
   );
-  const runningDirectionCount = stillRunning.filter(
-    (e) => e.type === "direction",
+  const runningRoadmapCount = stillRunning.filter(
+    (e) => e.type === "roadmap",
   ).length;
 
   const openIssues = issueList({
@@ -163,12 +163,12 @@ export function autoDev(): void {
     });
   }
 
-  function launchPr(pr: PrCandidate, kind: "pr-review" | "pr-comment") {
+  function launchPr(pr: PrCandidate, kind: "review" | "address-comments") {
     const worktreePath = gitWorktreeCreate({
       issueNumber: pr.issueNumber,
       branch: pr.headRefName,
     });
-    const label = kind === "pr-review" ? "レビュー" : "コメント対応";
+    const label = kind === "review" ? "レビュー" : "コメント対応";
     return {
       type: kind,
       scriptPath: SCRIPT_PATHS[kind],
@@ -212,11 +212,11 @@ export function autoDev(): void {
     )[0];
 
   if (highReadyPr) {
-    launched = launchPr(highReadyPr, "pr-review");
+    launched = launchPr(highReadyPr, "review");
   } else if (!anyHighPr && readyPr) {
-    launched = launchPr(readyPr, "pr-review");
+    launched = launchPr(readyPr, "review");
   } else if (unresolvedPr) {
-    launched = launchPr(unresolvedPr, "pr-comment");
+    launched = launchPr(unresolvedPr, "address-comments");
   } else if (filteredIssues.length > 0) {
     const issue =
       filteredIssues.find((i) => i.priority === "high") ?? filteredIssues[0];
@@ -225,8 +225,8 @@ export function autoDev(): void {
       branch: null,
     });
     launched = {
-      type: "issue",
-      scriptPath: SCRIPT_PATHS.issue,
+      type: "implement",
+      scriptPath: SCRIPT_PATHS.implement,
       args: {
         issue: {
           number: issue.number,
@@ -242,14 +242,14 @@ export function autoDev(): void {
       worktreePath,
     };
   } else if (
-    runningDirectionCount === 0 &&
-    openIssues.length < DIRECTION_MAX_OPEN_ISSUES
+    runningRoadmapCount === 0 &&
+    openIssues.length < ROADMAP_MAX_OPEN_ISSUES
   ) {
     launched = {
-      type: "direction",
-      scriptPath: SCRIPT_PATHS.direction,
+      type: "roadmap",
+      scriptPath: SCRIPT_PATHS.roadmap,
       args: undefined,
-      target: "direction 生成",
+      target: "roadmap 生成",
       worktreePath: null,
     };
   }

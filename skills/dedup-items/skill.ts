@@ -52,8 +52,6 @@ export function dedupItems(args: Infer<typeof ARGS_SCHEMA>) {
 
       重複の判定基準: ${SIMILARITY_CRITERIA[level]}
 
-      重複していない（本当に新規の）項目の、対象一覧における0始まりのインデックスだけを返してください
-
       対象一覧:
       ${JSON.stringify(items, null, 2)}
 

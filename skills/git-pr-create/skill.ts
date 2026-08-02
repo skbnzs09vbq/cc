@@ -1,12 +1,10 @@
-import { BASE_BRANCH, TARGET_REPO } from '../../local/project.js'
+import { BASE_BRANCH } from '../../local/project.js'
 import { gitPrDraft } from '../git-pr-draft/skill.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
+import { NAME, OWNER, REPO } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
-
-const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
-const [OWNER, NAME] = REPO.split('/')
 
 export const ARGS_SCHEMA = {
   type: 'object',

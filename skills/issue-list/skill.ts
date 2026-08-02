@@ -101,8 +101,7 @@ export function issueList(
 
       const deps = complete(
         dedent`
-          以下の issue それぞれについて、本文の「依存関係」セクションが前提とする他issueが
-          この一覧の中に実在すれば、その番号を dependsOnOpenIssues に含めてください
+          以下の issue 一覧:
 
           ${JSON.stringify(issues)}
         `,

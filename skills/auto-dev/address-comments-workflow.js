@@ -20,6 +20,15 @@ const E2E_SCHEMA = {
   required: ['clean', 'findings', 'screenshots'],
 }
 
+const VERIFY_SCHEMA = {
+  type: 'object',
+  properties: {
+    allAddressed: { type: 'boolean' },
+    message: { type: 'string' },
+  },
+  required: ['allAddressed', 'message'],
+}
+
 const AUTO_DEV_NOTE = 'auto-dev workflow からの実行です。ユーザー許可は得た上で呼び出されているので、確認を挟まず実行してください。'
 
 function withNote(argsObj) {
@@ -56,6 +65,12 @@ await agent(
   withNote({ workingDir: worktreePath, branch: pr.branch }),
   { agentType: 'git-push', phase: 'PR対応', label: `pr #${pr.number} push` }
 )
+
+const verify = await agent(
+  JSON.stringify({ workingDir: worktreePath, prNumber: pr.number }),
+  { agentType: 'git-pr-review-verify', schema: VERIFY_SCHEMA, phase: 'PR対応', label: `pr #${pr.number} スレッド確認・resolve` }
+)
+
 await agent(
   withNote({
     workingDir: worktreePath,
@@ -66,7 +81,9 @@ await agent(
   { agentType: 'git-pr-comment', phase: 'PR対応', label: `pr #${pr.number} 返信` }
 )
 
-const result = `pr #${pr.number} 対応完了`
+const result = verify.allAddressed
+  ? `pr #${pr.number} 対応完了（未解決スレッドを resolve 済み）`
+  : `pr #${pr.number} 対応完了（未解決スレッドが残っています: ${verify.message}）`
 log(result)
 
 return { result }

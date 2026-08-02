@@ -24,7 +24,7 @@ CLAUDE.md 内に、具体的なファイル名・ツール名・値などプロ�
     - `git commit` / `git push`
     - PR の作成
     - PR への加筆・編集・コメント
-    - `pr-review-workflow.js` が自身の判断で行う PR のマージ
+    - `review-workflow.js` が自身の判断で行う PR のマージ
   （`git switch` によるブランチ切り替えも、実行中の workflow の判断に任せてよい）
 
 ## Slack

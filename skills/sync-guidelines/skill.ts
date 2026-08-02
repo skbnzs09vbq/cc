@@ -92,8 +92,6 @@ export function syncGuidelines(): string {
       - CLAUDE.md・既存スキル・ガードレールにすでに書かれているルール
       - 実装以外の手続き（ワークフロー・コミット手順・スキルの使い方など）
       - すでに存在する指針の具体例に過ぎないもの（既存の指針で包含できるなら追加しない）
-
-      該当するパターンが1つも見つからない場合は candidates を null にしてください
     `,
     CANDIDATE_SCHEMA,
   )

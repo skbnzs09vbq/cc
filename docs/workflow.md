@@ -81,13 +81,13 @@ Workflow を定期的に起動する仕組み。cron式（5フィールド、ロ
 
 issue の作成から実装・レビュー・マージまで、役割ごとに分かれた workflow が AI だけで自走する
 
-- チケット作成者: `direction-workflow.js`  
+- チケット作成者: `roadmap-workflow.js`  
     仕様と実装状況から次の issue を作成  
-- 実装者: `issue-workflow.js`  
+- 実装者: `implement-workflow.js`  
     issue を計画 -> 実装 -> レビュー -> PR作成まで対応  
-- 修正者: `pr-comment-workflow.js`  
+- 修正者: `address-comments-workflow.js`  
     PR についた指摘コメントに対応  
-- レビュー者: `pr-review-workflow.js`  
+- レビュー者: `review-workflow.js`  
     PR をレビューし、問題なければマージ  
 
 skill.ts（状態管理・workflow の管理を行う）
@@ -97,13 +97,18 @@ skill.ts（状態管理・workflow の管理を行う）
 - 状態読み込み  
     - 実行中タスクがまだ動いているか確認  
 - 起動判定  
-    - 上限に達していなければ、比率が一番不足している type を選ぶ  
+    - 実行中件数が上限未満か確認（上限なら今回は起動しない）  
+    - 担当issue・自分のopen PRを集め、依存未解決・既に対応中・既存PRがあるものを除外  
+    - 優先順位ルール（決定木、上から順に最初に条件を満たしたもの1件だけを選ぶ）  
+        1. high優先度で対応可能なPRがあればレビューへ  
+        2. high優先度のPRが無く、対応可能なPRがあればレビューへ  
+        3. 未解決の指摘があるPRがあれば修正対応へ（high優先）  
+        4. 対応可能なissueがあれば実装へ（high優先）  
+        5. direction実行中が0件、かつopen issueがDIRECTION_MAX_OPEN_ISSUES件未満ならissue起票へ  
 - workflow 起動  
-    - auto-dev → issue か PR コメント対応を1件選び、worktree を用意して起動  
-    - pr-review → 自分の open PR を1件選び、worktree を用意して起動  
-    - direction → そのまま起動  
+    - 選ばれたPR/issueに応じてworktreeを用意し、対応する workflow を起動  
 
-issue-workflow.js（skill.ts が選んだ issue 1件を処理する）  
+implement-workflow.js（skill.ts が選んだ issue 1件を処理する）  
 ├── 計画立案  
 │   ├── `plan-issue` に issue URL を渡し実装計画を作成  
 │   └── 中止判定なら終了  
@@ -123,7 +128,7 @@ issue-workflow.js（skill.ts が選んだ issue 1件を処理する）
     ├── `git-pr-draft` で PR文面を作成  
     └── PR作成  
 
-pr-comment-workflow.js（skill.ts が選んだ PR 1 件を処理する）  
+address-comments-workflow.js（skill.ts が選んだ PR 1 件を処理する）  
 └── PR対応  
     ├── `git-pr-resolve-comments` に PR URL を渡し指摘に対応  
     ├── `test-e2e` で対応内容を動作確認  
@@ -132,7 +137,7 @@ pr-comment-workflow.js（skill.ts が選んだ PR 1 件を処理する）
     ├── push  
     └── PR に対応内容を返信  
 
-pr-review-workflow.js（skill.ts が選んだ open PR 1件をレビューする）  
+review-workflow.js（skill.ts が選んだ open PR 1件をレビューする）  
 ├── 状態確認  
 │   ├── レビュースレッドの resolved 状況を確認  
 │   └── 未解決の指摘があれば、最新コミットが対応できているか確認し、できていればスレッドを resolve  
@@ -144,7 +149,7 @@ pr-review-workflow.js（skill.ts が選んだ open PR 1件をレビューする�
     ├── マージできたら worktree を削除  
     └── それでも解消できなければ PR にその旨を返信  
 
-direction-workflow.js（毎回1件、次の issue を作成する）  
+roadmap-workflow.js（毎回1件、次の issue を作成する）  
 ├── 仕様・現状把握  
 │   ├── `research` で仕様を要求・機能ごとの項目一覧に分解  
 │   └── 既存の issue 一覧を取得  
@@ -160,17 +165,18 @@ direction-workflow.js（毎回1件、次の issue を作成する）
 
 ```mermaid
 flowchart TD
+    UserPrompt["ユーザーからの呼び出し"] --> SkillTs
     Cron["cron<br/>（毎分実行）"] --> SkillTs["状況を見て適切な workflow を動かす<br/>（skill.ts）"]
 
-    SkillTs --> IW0["実装者<br/>（issue-workflow.js）"]
+    SkillTs --> IW0["実装者<br/>（implement-workflow.js）"]
     IW0 --> IW1[計画を立てる] --> IW2[実装する] --> IW3[レビューして直す] --> IW4[PRを作る]
 
-    SkillTs --> PC0["修正者<br/>（pr-comment-workflow.js）"]
+    SkillTs --> PC0["修正者<br/>（address-comments-workflow.js）"]
     PC0 --> PC1[PRの指摘に対応する] --> PC2[動作確認する] --> PC3[PRに返信する]
 
-    SkillTs --> PR0["レビュー者<br/>（pr-review-workflow.js）"]
+    SkillTs --> PR0["レビュー者<br/>（review-workflow.js）"]
     PR0 --> PR1[PRをレビューする] --> PR2[問題なければマージする]
 
-    SkillTs --> DW0["チケット作成者<br/>（direction-workflow.js）"]
+    SkillTs --> DW0["チケット作成者<br/>（roadmap-workflow.js）"]
     DW0 --> DW1[仕様と実装状況を調べる] --> DW2[足りないissueを作る]
 ```
