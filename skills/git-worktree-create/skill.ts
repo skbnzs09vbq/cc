@@ -2,12 +2,12 @@ import {
   BASE_BRANCH,
   PROJECT_ROOT,
   TICKET_PREFIX,
-  VSCODE_WORKSPACE_FILE,
   WORKTREE_SETUP_COMMANDS,
 } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, readFile, respond, runCommand, writeFile } from '../_shared/complete.js'
+import { type Schema, respond, runCommand } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
+import { addWorkspaceFolder } from '../_shared/vscode-workspace.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
@@ -58,24 +58,7 @@ export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
       )
     }
 
-    if (VSCODE_WORKSPACE_FILE) {
-      const workspaceContent = readFile(VSCODE_WORKSPACE_FILE)
-
-      if (workspaceContent) {
-        const workspace = JSON.parse(workspaceContent)
-        const alreadyAdded = workspace.folders.some(
-          (folder: { path: string }) => folder.path === worktreePath,
-        )
-
-        if (!alreadyAdded) {
-          workspace.folders.push({
-            path: worktreePath,
-            name: `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`,
-          })
-          writeFile(VSCODE_WORKSPACE_FILE, JSON.stringify(workspace, null, 2))
-        }
-      }
-    }
+    addWorkspaceFolder(worktreePath, `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`)
   }
 
   return worktreePath

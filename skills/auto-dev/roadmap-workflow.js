@@ -45,7 +45,10 @@ const ITEMS_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          title: { type: 'string' },
+          title: {
+            type: 'string',
+            description: '「[high]」「[low]」等の優先度prefixは含めない（別途自動で付与される）',
+          },
           description: { type: 'string' },
           rationale: { type: 'string', description: 'なぜ今このissueが必要か' },
           priority: {
@@ -219,7 +222,7 @@ const created = await pipeline(
     agent(
       JSON.stringify({
         type: null,
-        title: `[${item.priority}] ${item.title}`,
+        title: `[${item.priority}] ${item.title.replace(/^\[(high|middle|low)\]\s*/i, '')}`,
         body: `## Description\n${item.description}\n\n## Rationale\n${item.rationale}`,
         tempFilePath: `scratchpad/issue_body_${index}.md`,
       }),

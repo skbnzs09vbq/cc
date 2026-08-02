@@ -4,6 +4,15 @@ import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 import { gitCommitMessage } from '../git-commit-message/skill.js'
 
+const PICKED_MESSAGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    message: { type: 'string' },
+    body: { type: ['string', 'null'] },
+  },
+  required: ['message', 'body'],
+} as const satisfies Schema
+
 export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
@@ -26,14 +35,7 @@ export function gitCommit(args: Infer<typeof ARGS_SCHEMA>): string {
 
         ${candidates}
       `,
-      {
-        type: 'object',
-        properties: {
-          message: { type: 'string' },
-          body: { type: ['string', 'null'] },
-        },
-        required: ['message', 'body'],
-      } as const,
+      PICKED_MESSAGE_SCHEMA,
     )
     message = picked.message
     body = picked.body

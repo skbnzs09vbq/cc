@@ -65,7 +65,11 @@ export function verifyNoProjectLeak(): string {
       STATE_PATH,
       JSON.stringify({ verifiedChecksum: checksum, verifiedAt: new Date().toISOString() }, null, 2),
     )
-    return 'project固有の情報は見つかりませんでした\n検証済みとして記録しました\nコミットして問題ありません'
+    return dedent`
+      project固有の情報は見つかりませんでした
+      検証済みとして記録しました
+      コミットして問題ありません
+    `
   }
 
   return dedent`

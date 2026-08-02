@@ -12,6 +12,12 @@ export interface Schema {
   items?: Schema
 }
 
+export const CONFIRM_SCHEMA = {
+  type: 'object',
+  properties: { confirmed: { type: 'boolean' } },
+  required: ['confirmed'],
+} as const satisfies Schema
+
 export declare function complete<S extends Schema | undefined = undefined>(
   prompt: string,
   schema?: S,

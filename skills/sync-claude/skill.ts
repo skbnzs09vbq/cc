@@ -1,5 +1,13 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, askUser, exit, generate, respond, runCommand } from '../_shared/complete.js'
+import {
+  CONFIRM_SCHEMA,
+  type Schema,
+  askUser,
+  exit,
+  generate,
+  respond,
+  runCommand,
+} from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -101,11 +109,7 @@ export function syncClaude(args: Infer<typeof ARGS_SCHEMA>): string {
 
       ${remoteClaudePath} 側の内容を正として、今の .claude に取り込んでよいですか？
     `,
-    {
-      type: 'object',
-      properties: { confirmed: { type: 'boolean' } },
-      required: ['confirmed'],
-    } as const,
+    CONFIRM_SCHEMA,
   ).confirmed
 
   if (!confirmed) exit('取り込みを中止しました')

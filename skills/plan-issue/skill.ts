@@ -4,10 +4,10 @@ import {
   GUIDELINES,
   PROJECT_ROOT,
   PR_TITLE_FORMAT,
-  TARGET_REPO,
   TASK_DIR,
   TYPES,
 } from '../../local/project.js'
+import { gitPrList } from '../git-pr-list/skill.js'
 import { grillMe } from '../grill-me/skill.js'
 import { research } from '../research/skill.js'
 import { getArgs } from '../_shared/args.js'
@@ -124,13 +124,14 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
   // ─── Phase 3: 調査 ────────────────────────────────────────────
   phase('調査')
 
+  const openPrs = gitPrList({ assignee: null, number: null, state: 'open' })
+
   const prCheck = complete(
-    buildCommandPrompt(
-      `"${issueLabel}" と実装が重複しそうな open/draft PR がないか確認してください`,
-      [
-        `gh pr list --repo ${TARGET_REPO} --state open --json number,title,headRefName,isDraft --limit 50`,
-      ],
-    ),
+    dedent`
+      "${issueLabel}" と実装が重複しそうな open/draft PR がないか、以下の一覧から確認してください
+
+      ${JSON.stringify(openPrs.map((pr) => ({ number: pr.number, title: pr.title, headRefName: pr.headRefName, isDraft: pr.isDraft })))}
+    `,
     PR_DUPLICATE_SCHEMA,
   )
 
@@ -146,7 +147,10 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
     if (!shouldContinue)
       return {
         aborted: true,
-        reason: `重複する PR がある可能性があるため、計画立案を中止しました\n${(prCheck.prs ?? []).join('\n')}`,
+        reason: dedent`
+          重複する PR がある可能性があるため、計画立案を中止しました
+          ${(prCheck.prs ?? []).join('\n')}
+        `,
         issueId: null,
         planContent: null,
       }

@@ -2,9 +2,18 @@ import { BASE_BRANCH } from '../../local/project.js'
 import { gitPrDraft } from '../git-pr-draft/skill.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
-import { NAME, OWNER, REPO } from '../_shared/git.js'
+import { NAME, OWNER, REPO, gitBuildScreenshotsSection } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
+
+const PICKED_DRAFT_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    description: { type: 'string' },
+  },
+  required: ['title', 'description'],
+} as const satisfies Schema
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -64,18 +73,12 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
     const draft = gitPrDraft(workDescription ?? '')
     const picked = complete(
       dedent`
-        以下は PR タイトル・description の下書きです\nこの内容をそのまま採用してください
+        以下は PR タイトル・description の下書きです
+        この内容をそのまま採用してください
 
         ${draft}
       `,
-      {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
-        },
-        required: ['title', 'description'],
-      } as const,
+      PICKED_DRAFT_SCHEMA,
     )
     title = picked.title
     description = picked.description
@@ -83,22 +86,14 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
 
   const base = args.base ?? BASE_BRANCH
 
-  const screenshotsSection = screenshots?.length
-    ? dedent`
-        ## スクリーンショット
-        ${screenshots
-          .map((path) => {
-            const normalized = path.replace(/\\/g, '/')
-            const workingDirNormalized = workingDir.replace(/\\/g, '/')
-            const relPath = normalized.startsWith(workingDirNormalized)
-              ? normalized.slice(workingDirNormalized.length).replace(/^\//, '')
-              : normalized.split('/').pop()!
-            const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${NAME}/${args.head}/${relPath}`
-            return `![${normalized.split('/').pop()}](${rawUrl})`
-          })
-          .join('\n')}
-      `
-    : null
+  const screenshotsSection = gitBuildScreenshotsSection(screenshots, (path) => {
+    const normalized = path.replace(/\\/g, '/')
+    const workingDirNormalized = workingDir.replace(/\\/g, '/')
+    const relPath = normalized.startsWith(workingDirNormalized)
+      ? normalized.slice(workingDirNormalized.length).replace(/^\//, '')
+      : normalized.split('/').pop()!
+    return `https://raw.githubusercontent.com/${OWNER}/${NAME}/${args.head}/${relPath}`
+  })
 
   const bodyContent = [
     closesIssue ? `Closes #${closesIssue}` : null,

@@ -1,7 +1,7 @@
 import { getArgs } from '../_shared/args.js'
 import { type Schema, respond, runCommand, writeFile } from '../_shared/complete.js'
+import { gitBuildScreenshotsSection } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
-import { dedent } from '../_shared/utils.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -24,22 +24,10 @@ export const ARGS_SCHEMA = {
 export function gitPrComment(args: Infer<typeof ARGS_SCHEMA>): string | null {
   const { workingDir, prNumber, body, screenshots } = args
 
-  const screenshotsSection = screenshots?.length
-    ? dedent`
-        ## スクリーンショット
-        ${screenshots
-          .map((path) => {
-            const url = runCommand([
-              `gh gist create ${path} --filename '${path.split('/').pop()}' -q`,
-            ])
-            const rawUrl = runCommand([
-              `gh api gists/${url?.split('/').pop()} -q '.files[].raw_url'`,
-            ])
-            return `![${path.split('/').pop()}](${rawUrl})`
-          })
-          .join('\n')}
-      `
-    : null
+  const screenshotsSection = gitBuildScreenshotsSection(screenshots, (path) => {
+    const url = runCommand([`gh gist create ${path} --filename '${path.split('/').pop()}' -q`])
+    return runCommand([`gh api gists/${url?.split('/').pop()} -q '.files[].raw_url'`])
+  })
 
   const commentPath = `${workingDir}/.pr_comment.md`
   writeFile(commentPath, [body, screenshotsSection].filter(Boolean).join('\n\n'))

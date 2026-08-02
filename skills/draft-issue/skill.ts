@@ -113,7 +113,10 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
   phase('不足項目の質問')
 
   const missingFields = complete(
-    'fields のうち、根拠なく推測でしか埋められない項目を列挙してください\nすべて確定できていれば null を返してください',
+    dedent`
+      fields のうち、根拠なく推測でしか埋められない項目を列挙してください
+      すべて確定できていれば null を返してください
+    `,
     { type: ['array', 'null'], items: { type: 'string' } } as const,
   )
 

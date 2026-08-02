@@ -35,6 +35,7 @@ const RAW_PR_SCHEMA = {
     state: { type: "string" },
     body: { type: ["string", "null"] },
     headRefName: { type: "string" },
+    isDraft: { type: "boolean" },
     author: {
       type: "object",
       properties: { login: { type: "string" } },
@@ -54,6 +55,7 @@ const RAW_PR_SCHEMA = {
     "state",
     "body",
     "headRefName",
+    "isDraft",
     "author",
     "closesIssue",
   ],

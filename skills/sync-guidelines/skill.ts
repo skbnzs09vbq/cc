@@ -127,7 +127,7 @@ export function syncGuidelines(): string {
       ${OUTPUT_FORMAT}
 
       fileContent には、この出力フォーマットに従った Markdown 全文を返してください
-      changes には、今回の更新で実際に追加・更新・統合・削除した指針を列挙してください（変更がなければ null）
+      changes には、今回の更新で実際に追加・更新・統合・削除した指針を列挙してください
     `,
     MERGE_SCHEMA,
   )

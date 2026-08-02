@@ -48,6 +48,15 @@ const RESULT_SCHEMA = {
   required: ['clean', 'findings', 'screenshots'],
 } as const satisfies Schema
 
+const JUDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    clean: RESULT_SCHEMA.properties.clean,
+    findings: RESULT_SCHEMA.properties.findings,
+  },
+  required: ['clean', 'findings'],
+} as const satisfies Schema
+
 const SERVER_SCHEMA = {
   type: 'object',
   properties: {
@@ -142,14 +151,7 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
       実行結果:
       ${output || '(出力なし)'}
     `,
-    {
-      type: 'object',
-      properties: {
-        clean: { type: 'boolean' },
-        findings: { type: ['string', 'null'] },
-      },
-      required: ['clean', 'findings'],
-    } as const,
+    JUDGE_SCHEMA,
   )
 
   runCommand([`rm -f ${scriptPath}`])

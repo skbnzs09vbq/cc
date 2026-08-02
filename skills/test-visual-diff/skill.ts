@@ -62,6 +62,16 @@ const RESULT_SCHEMA = {
   required: ['matchesExpectation', 'hasDiff', 'findings', 'screenshots'],
 } as const satisfies Schema
 
+const JUDGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    matchesExpectation: RESULT_SCHEMA.properties.matchesExpectation,
+    hasDiff: RESULT_SCHEMA.properties.hasDiff,
+    findings: RESULT_SCHEMA.properties.findings,
+  },
+  required: ['matchesExpectation', 'hasDiff', 'findings'],
+} as const satisfies Schema
+
 const SCRIPTS_DIR = '.claude/skills/test-visual-diff/scripts'
 
 function captureRef(workingDir: string, ref: string, worktreeDir: string, url: string, serverCommand: string | null, port: number | null, outputPath: string) {
@@ -122,19 +132,8 @@ export function testVisualDiff(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RE
       期待:
       - 差分が出ることを${expectDiff ? '期待する' : '期待しない（出てはいけない）'}
       ${expectDiff && expectedArea ? `- 差分が出るべき箇所: ${expectedArea}（それ以外の箇所に差分があれば想定外＝デグレの疑い）` : ''}
-
-      matchesExpectation は、実際の差分（の有無・箇所）が上記の期待と一致していれば true
-      一致しなければ false とし、findings に具体的にどう違ったかを書いてください
     `,
-    {
-      type: 'object',
-      properties: {
-        matchesExpectation: { type: 'boolean' },
-        hasDiff: { type: 'boolean' },
-        findings: { type: ['string', 'null'] },
-      },
-      required: ['matchesExpectation', 'hasDiff', 'findings'],
-    } as const,
+    JUDGE_SCHEMA,
   )
 
   return {

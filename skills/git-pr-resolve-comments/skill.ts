@@ -10,7 +10,7 @@ import {
   respond,
   runCommand,
 } from '../_shared/complete.js'
-import { REPO } from '../_shared/git.js'
+import { REPO, gitPrReviews } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -65,9 +65,7 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
   const prNumber = generate(`"${input}" から PR 番号を抽出してください`)
 
   const reviewComments = gitPrCommentsList({ prNumber: Number(prNumber) })
-  const reviews = runCommand([
-    `gh api repos/${REPO}/pulls/${prNumber}/reviews --jq '.[] | select(.body != "") | {user: .user.login, state: .state, body: .body}'`,
-  ])
+  const reviews = gitPrReviews(Number(prNumber))
 
   // ─── Phase 2: カテゴリ分け・提示 ───────────────────────────
   phase('カテゴリ分け・提示')

@@ -1,15 +1,16 @@
-import { PROJECT_ROOT, TICKET_PREFIX, VSCODE_WORKSPACE_FILE } from '../../local/project.js'
+import { PROJECT_ROOT, TICKET_PREFIX } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import {
+  CONFIRM_SCHEMA,
   type Schema,
   askUser,
   exit,
-  readFile,
   respond,
   runCommand,
-  writeFile,
 } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
+import { dedent } from '../_shared/utils.js'
+import { removeWorkspaceFolder } from '../_shared/vscode-workspace.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
@@ -46,12 +47,11 @@ export function gitWorktreeRemove(args: Infer<typeof ARGS_SCHEMA>): string {
 
   if (stillExists) {
     forceConfirmed ??= askUser(
-      `${worktreePath} には未コミットの変更または未追跡ファイルがあり、通常の削除に失敗しました\n強制的に削除してよいですか？（変更内容は失われます）`,
-      {
-        type: 'object',
-        properties: { confirmed: { type: 'boolean' } },
-        required: ['confirmed'],
-      } as const,
+      dedent`
+        ${worktreePath} には未コミットの変更または未追跡ファイルがあり、通常の削除に失敗しました
+        強制的に削除してよいですか？（変更内容は失われます）
+      `,
+      CONFIRM_SCHEMA,
     ).confirmed
 
     if (!forceConfirmed) exit('削除を中止しました')
@@ -62,20 +62,7 @@ export function gitWorktreeRemove(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 3: VSCode workspace からの除去 ───────────────────
   phase('VSCode workspaceからの除去')
 
-  if (VSCODE_WORKSPACE_FILE) {
-    const absoluteWorktreePath = `${PROJECT_ROOT}/${worktreePath}`
-    const workspaceContent = readFile(VSCODE_WORKSPACE_FILE)
-
-    if (workspaceContent) {
-      const workspace = JSON.parse(workspaceContent)
-      const before = workspace.folders.length
-      workspace.folders = workspace.folders.filter(
-        (folder: { path: string }) => folder.path !== absoluteWorktreePath,
-      )
-      if (workspace.folders.length !== before)
-        writeFile(VSCODE_WORKSPACE_FILE, JSON.stringify(workspace, null, 2))
-    }
-  }
+  removeWorkspaceFolder(`${PROJECT_ROOT}/${worktreePath}`)
 
   return `${worktreePath} を削除しました（ブランチ自体は削除していません）`
 }

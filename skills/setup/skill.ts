@@ -1,5 +1,6 @@
 import { getArgs } from '../_shared/args.js'
 import {
+  CONFIRM_SCHEMA,
   type Schema,
   askUser,
   exit,
@@ -14,6 +15,10 @@ import { dedent } from '../_shared/utils.js'
 
 const TEMPLATE_PATH = '.claude/project.example.ts'
 const OUTPUT_PATH = '.claude/local/project.ts'
+
+function extractBaseBranch(content: string): string {
+  return content.match(/BASE_BRANCH\s*=\s*['"]([^'"]+)['"]/)?.[1] || 'main'
+}
 
 const ARGS_SCHEMA = {
   type: 'object',
@@ -72,6 +77,24 @@ const VALUES_SCHEMA: Schema = {
   description:
     '対象定数名をキー、確定値を値としたオブジェクト\n確認・変更が不要な定数はキーごと含めない',
 }
+
+const ADD_CLAUDE_SCHEMA = {
+  type: 'object',
+  properties: { addClaude: { type: 'boolean' } },
+  required: ['addClaude'],
+} as const satisfies Schema
+
+const CONFIRM_PUSH_SCHEMA = {
+  type: 'object',
+  properties: { confirmedPush: { type: 'boolean' } },
+  required: ['confirmedPush'],
+} as const satisfies Schema
+
+const GIT_POLICY_SCHEMA = {
+  type: 'object',
+  properties: { gitPolicy: { type: 'string', enum: ['no-git', 'no-commit', 'normal'] } },
+  required: ['gitPolicy'],
+} as const satisfies Schema
 
 export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
   const { mode, names } = args
@@ -171,11 +194,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
           追加しますか？
           追加しない場合は .claude をそのまま通常の git 管理下に置きます
         `,
-        {
-          type: 'object',
-          properties: { addClaude: { type: 'boolean' } },
-          required: ['addClaude'],
-        } as const,
+        ADD_CLAUDE_SCHEMA,
       ).addClaude
 
       if (addClaude) {
@@ -205,11 +224,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
 
           ${GITIGNORE_PATH} をコミットしてよいですか？
         `,
-        {
-          type: 'object',
-          properties: { confirmed: { type: 'boolean' } },
-          required: ['confirmed'],
-        } as const,
+        CONFIRM_SCHEMA,
       ).confirmed
 
       if (gitignoreCommitConfirmed) {
@@ -220,14 +235,10 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
           'git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null',
         ])
         if (!hasUpstream) {
-          const baseBranch = newContent.match(/BASE_BRANCH\s*=\s*['"]([^'"]+)['"]/)?.[1] || 'main'
+          const baseBranch = extractBaseBranch(newContent)
           gitignorePushConfirmed ??= askUser(
             `この内容を origin/${baseBranch}（project.ts の BASE_BRANCH）に push してよいですか？（worktree 作成には push 済みの状態が必要です）`,
-            {
-              type: 'object',
-              properties: { confirmedPush: { type: 'boolean' } },
-              required: ['confirmedPush'],
-            } as const,
+            CONFIRM_PUSH_SCHEMA,
           ).confirmedPush
 
           if (gitignorePushConfirmed) {
@@ -238,9 +249,10 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
           }
         }
       } else {
-        respond(
-          `${GITIGNORE_PATH} のコミットは行いませんでした\nコミットするまで .claude が worktree で ignore されない点に注意してください`,
-        )
+        respond(dedent`
+          ${GITIGNORE_PATH} のコミットは行いませんでした
+          コミットするまで .claude が worktree で ignore されない点に注意してください
+        `)
       }
     }
   }
@@ -264,11 +276,7 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
         2. no-commit: .git は残すが commit・push を禁止する（履歴の参照・pull はできるが書き込みは不可）
         3. normal: 通常通り commit・push できる（デフォルト）
       `,
-      {
-        type: 'object',
-        properties: { gitPolicy: { type: 'string', enum: ['no-git', 'no-commit', 'normal'] } },
-        required: ['gitPolicy'],
-      } as const,
+      GIT_POLICY_SCHEMA,
     ).gitPolicy
 
     if (gitPolicy === 'no-git') {
@@ -335,17 +343,17 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
   phase('初回コミット確認')
 
   if (isInitialSetup && /USE_AUTO_DEV\s*=\s*true/.test(newContent)) {
-    const baseBranch = newContent.match(/BASE_BRANCH\s*=\s*['"]([^'"]+)['"]/)?.[1] || 'main'
+    const baseBranch = extractBaseBranch(newContent)
     const hasCommits = runCommand(['git rev-parse --verify HEAD'])
 
     if (!hasCommits) {
       initialCommitConfirmed ??= askUser(
-        'このリポジトリにはまだコミットが1つもありません\nauto-dev の worktree 作成には最低1つのコミットが必要です\n空の初回コミット（chore: initial empty commit）を作成してよいですか？',
-        {
-          type: 'object',
-          properties: { confirmed: { type: 'boolean' } },
-          required: ['confirmed'],
-        } as const,
+        dedent`
+          このリポジトリにはまだコミットが1つもありません
+          auto-dev の worktree 作成には最低1つのコミットが必要です
+          空の初回コミット（chore: initial empty commit）を作成してよいですか？
+        `,
+        CONFIRM_SCHEMA,
       ).confirmed
 
       if (initialCommitConfirmed) {
@@ -354,18 +362,17 @@ export function setup(args: Infer<typeof ARGS_SCHEMA>): void {
 
         initialCommitPushConfirmed ??= askUser(
           `この初回コミットを origin/${baseBranch}（project.ts の BASE_BRANCH）に push してよいですか？（worktree 作成には push 済みの状態が必要です）`,
-          {
-            type: 'object',
-            properties: { confirmedPush: { type: 'boolean' } },
-            required: ['confirmedPush'],
-          } as const,
+          CONFIRM_PUSH_SCHEMA,
         ).confirmedPush
 
         if (initialCommitPushConfirmed) {
           runCommand([`git push -u origin HEAD:${baseBranch}`])
           respond('push しました')
         } else {
-          respond('push は行いませんでした\npush するまで auto-dev の worktree 作成は失敗します')
+          respond(dedent`
+            push は行いませんでした
+            push するまで auto-dev の worktree 作成は失敗します
+          `)
         }
       }
     }

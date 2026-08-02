@@ -21,8 +21,10 @@ import {
   type RawIssueWithDependencies,
 } from "../issue-list/skill.js";
 
-const CRON_PROMPT =
-  "auto-dev スキルを実行してください\n前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと";
+const CRON_PROMPT = dedent`
+  auto-dev スキルを実行してください
+  前回起動した taskId がまだ running かを確認するだけで終わらせず、必ず skill.ts の Phase 1（状態読み込み・プルーニング）から全フェーズを毎回実行し直すこと
+`;
 const STATE_PATH = ".claude/local/running-workflows.json";
 const ROADMAP_MAX_OPEN_ISSUES = 5;
 
