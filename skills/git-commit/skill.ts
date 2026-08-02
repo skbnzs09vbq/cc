@@ -17,8 +17,8 @@ export const ARGS_SCHEMA = {
   type: 'object',
   properties: {
     workingDir: { type: 'string', description: 'commit を実行するディレクトリ' },
-    message: { type: ['string', 'null'], description: 'コミットメッセージ\n未定なら null' },
-    body: { type: ['string', 'null'], description: 'コミット本文（任意）' },
+    message: { type: ['string', 'null'], description: 'string: コミットメッセージ, null: 未定な場合' },
+    body: { type: ['string', 'null'], description: 'string: コミット本文, null: 任意（無くてよい）' },
   },
   required: ['workingDir', 'message', 'body'],
 } as const satisfies Schema

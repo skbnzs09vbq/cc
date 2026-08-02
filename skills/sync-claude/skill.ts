@@ -21,7 +21,7 @@ const ARGS_SCHEMA = {
     },
     confirmed: {
       type: ['boolean', 'null'],
-      description: '取り込んでよいか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: 取り込んでよいか, null: 未定（ユーザーに確認する）',
     },
   },
   required: ['path', 'confirmed'],

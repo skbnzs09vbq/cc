@@ -21,10 +21,16 @@ const REVIEW_ITEM_SCHEMA = {
     properties: {
       id: {
         type: ['number', 'null'],
-        description: 'レビューコメント側の id\nレビュー本文由来など id が無いものは null',
+        description: 'number: レビューコメント側の id, null: レビュー本文由来など id が無い場合',
       },
-      file: { type: ['string', 'null'], description: '対象ファイルパス\n無ければ null' },
-      line: { type: ['string', 'number', 'null'], description: '対象行\n無ければ null' },
+      file: {
+        type: ['string', 'null'],
+        description: 'string: 対象ファイルパス, null: 対象ファイルが無い場合',
+      },
+      line: {
+        type: ['string', 'number', 'null'],
+        description: 'string/number: 対象行, null: 対象行が無い場合',
+      },
       original: { type: 'string', description: '指摘の原文' },
       summary: { type: 'string', description: '指摘内容の要約' },
       validity: {
@@ -41,12 +47,15 @@ export const ARGS_SCHEMA = {
   properties: {
     workingDir: {
       type: ['string', 'null'],
-      description: '対応を行う作業ディレクトリ\n未指定ならカレントディレクトリ',
+      description: 'string: 対応を行う作業ディレクトリ, null: 未指定（カレントディレクトリ）',
     },
-    url: { type: ['string', 'null'], description: '対象の GitHub PR URL\n無ければ null' },
+    url: {
+      type: ['string', 'null'],
+      description: 'string: 対象の GitHub PR URL, null: 無ければ',
+    },
     autonomous: {
       type: 'boolean',
-      description: 'workflow 等からの無人実行なら true\nユーザーが直接呼んだ場合は false',
+      description: 'true: workflow 等からの無人実行, false: ユーザーが直接呼んだ場合',
     },
   },
   required: ['workingDir', 'url', 'autonomous'],
@@ -105,11 +114,11 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
     ? 2
     : askUser(
         dedent`
-      上記の指摘にどう対応しますか？
+          上記の指摘にどう対応しますか？
 
-      1. 1件ずつ対応する（1件ごとに次へ進むか確認する）
-      2. 不要な項目を番号で除外して、まとめて対応する
-    `,
+          1. 1件ずつ対応する（1件ごとに次へ進むか確認する）
+          2. 不要な項目を番号で除外して、まとめて対応する
+        `,
         { type: 'number', enum: [1, 2] } as const,
       )
 

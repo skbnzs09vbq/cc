@@ -36,28 +36,29 @@ const ARGS_SCHEMA = {
     },
     addClaude: {
       type: ['boolean', 'null'],
-      description: '.gitignore に .claude を追加してよいか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: .gitignore に .claude を追加してよいか, null: 未定（ユーザーに確認する）',
     },
     gitignoreCommitConfirmed: {
       type: ['boolean', 'null'],
-      description: '.gitignore をコミットしてよいか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: .gitignore をコミットしてよいか, null: 未定（ユーザーに確認する）',
     },
     gitignorePushConfirmed: {
       type: ['boolean', 'null'],
-      description: '.gitignore のコミットを push してよいか\n未定なら null（ユーザーに確認する）',
+      description:
+        'boolean: .gitignore のコミットを push してよいか, null: 未定（ユーザーに確認する）',
     },
     gitPolicy: {
       type: ['string', 'null'],
       enum: ['no-git', 'no-commit', 'normal', null],
-      description: '.claude 自身の git 管理方針\n未定なら null（ユーザーに確認する）',
+      description: 'string: .claude 自身の git 管理方針, null: 未定（ユーザーに確認する）',
     },
     initialCommitConfirmed: {
       type: ['boolean', 'null'],
-      description: '空の初回コミットを作成してよいか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: 空の初回コミットを作成してよいか, null: 未定（ユーザーに確認する）',
     },
     initialCommitPushConfirmed: {
       type: ['boolean', 'null'],
-      description: '初回コミットを push してよいか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: 初回コミットを push してよいか, null: 未定（ユーザーに確認する）',
     },
   },
   required: [

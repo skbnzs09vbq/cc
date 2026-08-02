@@ -1,5 +1,5 @@
 import { parseArgs } from '../_shared/args.js'
-import { type Schema, askUser, complete, respond } from '../_shared/complete.js'
+import { type Schema, askUser, complete, generate, respond } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
 
 const NEXT_QUESTION_SCHEMA = {
@@ -12,7 +12,7 @@ const NEXT_QUESTION_SCHEMA = {
     question: {
       type: ['string', 'null'],
       description:
-        'done が false の場合、次に確認すべき論点を1つだけ、自分なりの推奨案とその理由を添えて返す（true の場合は null）',
+        'string: done が false の場合の、次に確認すべき論点を1つだけ、自分なりの推奨案とその理由を添えたもの, null: done が true の場合',
     },
   },
   required: ['done', 'question'],
@@ -41,7 +41,7 @@ export function grillMe(plan: string): string {
 
     const answer = askUser(next.question)
 
-    updatedPlan = complete(dedent`
+    updatedPlan = generate(dedent`
       以下のプランに、質問への回答を反映して更新してください
 
       プラン:

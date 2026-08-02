@@ -21,7 +21,7 @@ export const ARGS_SCHEMA = {
     forceConfirmed: {
       type: ['boolean', 'null'],
       description:
-        '通常削除に失敗した場合、強制削除してよいか\n未定なら null（ユーザーに確認する）',
+        'boolean: 通常削除に失敗した場合、強制削除してよいか, null: 未定（ユーザーに確認する）',
     },
   },
   required: ['issueNumber', 'forceConfirmed'],

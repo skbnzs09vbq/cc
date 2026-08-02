@@ -26,7 +26,7 @@ const FINDING_SCHEMA = {
       label: { type: ['string', 'null'] },
       result: {
         type: ['string', 'null'],
-        description: '検索・取得結果\n対応するツールが見つからない・取得できない場合は null',
+        description: 'string: 検索・取得結果, null: 対応するツールが見つからない・取得できない場合',
       },
     },
     required: ['type', 'value', 'label', 'result'],

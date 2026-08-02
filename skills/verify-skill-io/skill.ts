@@ -1,5 +1,5 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, respond, runCommand } from '../_shared/complete.js'
+import { type Schema, complete, generate, respond, runCommand } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -13,7 +13,7 @@ const FINDING_SCHEMA = {
   type: 'object',
   properties: {
     file: { type: 'string', description: '不一致が見つかった workflow.js のパス' },
-    line: { type: ['integer', 'null'], description: '該当行（分からなければ null）' },
+    line: { type: ['integer', 'null'], description: 'integer: 該当行, null: 分からなければ' },
     callSite: { type: 'string', description: '該当する agent()/Skill() 呼び出しの要約' },
     targetSkill: { type: 'string', description: '呼び出し先の skill 名' },
     issue: { type: 'string', description: '入力または出力の不一致の具体的な内容' },
@@ -47,14 +47,12 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 3: 意味的な突合 ───────────────────────────────────
   phase('意味的な突合')
 
-  const rawFindings = Agent({
-    subagent_type: 'general-purpose',
-    description: 'skill間のinput/output整合性チェック',
-    prompt: dedent`
-      以下は .claude/skills 配下の全 skill.ts（関数化済み\nARGS_SCHEMA と export function の
-      返り値の型注釈が、そのskillの正しい入出力仕様）と、.claude/skills/auto-dev 配下の
-      全 workflow.js（agent(prompt, {agentType, schema}) や Skill(name, args) で他の skill を
-      呼び出す実際のコード）です
+  const findings = complete(
+    dedent`
+      以下は .claude/skills 配下の全 skill.ts（関数化済み
+      ARGS_SCHEMA と export function の返り値の型注釈が、そのskillの正しい入出力仕様）と、
+      .claude/skills/auto-dev 配下の全 workflow.js（agent(prompt, {agentType, schema}) や
+      Skill(name, args) で他の skill を呼び出す実際のコード）です
 
       workflow.js 内の agent()/Skill() 呼び出し1件ずつについて、agentType/Skill名から
       呼び出し先の skill.ts を特定し、次の不一致が無いか確認してください
@@ -65,23 +63,13 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
         プロパティを過不足なく供給できていない（明らかに欠けている・型が違う場合のみ）
       - agentType / Skill 名が実在する skill フォルダを指していない
 
-      推測での指摘はせず、実際にコードを読み比べて明確に不一致と判断できるものだけ報告してください
-      該当箇所ごとに、ファイル・該当行・呼び出し内容の要約・呼び出し先 skill 名・不一致の内容を書いてください
-      不一致が無ければ「不一致なし」とだけ返してください
+      推測での指摘はせず、実際にコードを読み比べて明確に不一致と判断できるものだけ報告してください（無ければ空配列）
 
       skill.ts 一覧:
       ${skillSources}
 
       workflow.js 一覧:
       ${workflowSources}
-    `,
-  })
-
-  const findings = complete(
-    dedent`
-      以下のレビュー結果を、指定された形式の配列に整形してください（「不一致なし」であれば空配列）
-
-      ${rawFindings}
     `,
     FINDINGS_SCHEMA,
   )
@@ -105,7 +93,7 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
     問題が無ければ「不一致なし ✓」とだけ書く
   `
 
-  return complete(
+  return generate(
     dedent`
       以下の結果を、出力フォーマットのテンプレートに従って1つのレポートに整形してください
 

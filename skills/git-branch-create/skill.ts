@@ -9,15 +9,17 @@ export const ARGS_SCHEMA = {
     workingDir: { type: 'string', description: 'ブランチ作成を実行するディレクトリ' },
     branchName: {
       type: ['string', 'null'],
-      description: '作成するブランチ名\n未定なら null',
+      description: 'string: 作成するブランチ名, null: 未定な場合',
     },
     baseBranch: {
       type: ['string', 'null'],
-      description: '分岐元ブランチ名\nworkDescription 中に明記があればそれ、なければ null',
+      description:
+        'string: 分岐元ブランチ名（workDescription 中に明記があればそれ）, null: 明記が無ければ',
     },
     workDescription: {
       type: ['string', 'null'],
-      description: 'branchName が null の場合に、ブランチ名を決めるための作業内容の説明',
+      description:
+        'string: branchName が null の場合に、ブランチ名を決めるための作業内容の説明, null: branchName が指定済みの場合',
     },
   },
   required: ['workingDir', 'branchName', 'baseBranch', 'workDescription'],

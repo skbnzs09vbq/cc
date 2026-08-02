@@ -20,7 +20,7 @@ const ARGS_SCHEMA = {
     },
     branch: {
       type: ['string', 'null'],
-      description: 'チェックアウトする既存ブランチ名\n新規 issue 対応でまだ無ければ null',
+      description: 'string: チェックアウトする既存ブランチ名, null: 新規 issue 対応でまだ無い場合',
     },
   },
   required: ['issueNumber', 'branch'],

@@ -30,7 +30,7 @@ const ISSUE_SCHEMA = {
   properties: {
     id: {
       type: ['string', 'null'],
-      description: 'Issue の識別子（チケット番号等）\n入力に含まれなければ null',
+      description: 'string: Issue の識別子（チケット番号等）, null: 入力に含まれなければ',
     },
     title: { type: 'string' },
     description: { type: 'string' },
@@ -49,7 +49,7 @@ const PR_DUPLICATE_SCHEMA = {
     prs: {
       type: ['array', 'null'],
       description:
-        'duplicate が true の場合、該当 PR の一覧（"PR #XX タイトル (draft/open)" 形式）\nfalse の場合は null',
+        'array: duplicate が true の場合の該当 PR 一覧（"PR #XX タイトル (draft/open)" 形式）, null: duplicate が false の場合',
       items: { type: 'string' },
     },
   },
@@ -76,7 +76,7 @@ const APPROVAL_SCHEMA = {
     },
     feedback: {
       type: ['string', 'null'],
-      description: 'approved が false の場合、修正してほしい内容\ntrue の場合は null',
+      description: 'string: approved が false の場合の修正してほしい内容, null: approved が true の場合',
     },
   },
   required: ['approved', 'feedback'],
@@ -89,7 +89,7 @@ export const ARGS_SCHEMA = {
     shouldContinue: {
       type: ['boolean', 'null'],
       description:
-        '重複しそうな PR がある場合でも計画を続けるか\n未定なら null（ユーザーに確認する）',
+        'boolean: 重複しそうな PR がある場合でも計画を続けるか, null: 未定（ユーザーに確認する）',
     },
   },
   required: ['issueInput', 'shouldContinue'],
@@ -290,7 +290,7 @@ export function planIssue(args: Infer<typeof ARGS_SCHEMA>): {
 
     if (response.approved) approved = true
     else {
-      planContent = complete(dedent`
+      planContent = generate(dedent`
         以下のフィードバックを反映して実装計画を更新してください
 
         実装計画:

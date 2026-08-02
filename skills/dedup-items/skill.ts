@@ -18,12 +18,13 @@ export const ARGS_SCHEMA = {
     },
     existing: {
       type: ['array', 'string'],
-      description: '既存の項目一覧\nこの中に実質的に同じ内容があれば重複として除外される',
+      description:
+        'array/string: 既存の項目一覧（この中に実質的に同じ内容があれば重複として除外される）',
     },
     similarityLevel: {
       type: ['integer', 'null'],
       enum: [1, 2, 3, null],
-      description: `重複とみなす基準の厳しさ\n未指定なら 2\n1: ${SIMILARITY_CRITERIA[1]} / 2: ${SIMILARITY_CRITERIA[2]} / 3: ${SIMILARITY_CRITERIA[3]}`,
+      description: `integer: 重複とみなす基準の厳しさ（1: ${SIMILARITY_CRITERIA[1]} / 2: ${SIMILARITY_CRITERIA[2]} / 3: ${SIMILARITY_CRITERIA[3]}）, null: 未指定（2 を使う）`,
     },
   },
   required: ['items', 'existing', 'similarityLevel'],

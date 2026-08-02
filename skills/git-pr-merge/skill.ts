@@ -1,7 +1,6 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, respond, runCommand } from '../_shared/complete.js'
+import { type Schema, respond, runCommand } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
-import { dedent } from '../_shared/utils.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -29,24 +28,20 @@ export function gitPrMerge(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT
   const { workingDir, prNumber } = args
 
   const mergeResult = runCommand([`cd ${workingDir} && gh pr merge ${prNumber} --squash`])
-  const status = runCommand([`gh pr view ${prNumber} --json state,mergeable`])
+  const statusRaw = runCommand([`gh pr view ${prNumber} --json state,mergeable`])
+  const status = JSON.parse(statusRaw || '{}') as { state?: string; mergeable?: string }
 
-  return complete(
-    dedent`
-      以下の gh pr merge 実行結果と、マージ後の PR 状態から判定してください
-
-      merge 実行結果:
-      ${mergeResult}
-
-      PR 状態（state, mergeable）:
-      ${status}
-
-      state が MERGED なら merged:true, conflict:false
-      それ以外で mergeable が CONFLICTING なら merged:false, conflict:true
-      それ以外なら merged:false, conflict:false とし、message に理由を入れてください
-    `,
-    RESULT_SCHEMA,
-  )
+  if (status.state === 'MERGED') {
+    return { merged: true, conflict: false, message: mergeResult || 'マージに成功しました' }
+  }
+  if (status.mergeable === 'CONFLICTING') {
+    return { merged: false, conflict: true, message: 'base ブランチとコンフリクトしています' }
+  }
+  return {
+    merged: false,
+    conflict: false,
+    message: mergeResult || `state: ${status.state}, mergeable: ${status.mergeable}`,
+  }
 }
 
 respond(gitPrMerge(getArgs(ARGS_SCHEMA)))

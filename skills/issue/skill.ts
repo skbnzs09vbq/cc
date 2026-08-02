@@ -13,7 +13,7 @@ const BASE_BRANCH_SCHEMA = {
   properties: {
     baseBranch: {
       type: ['string', 'null'],
-      description: '実装計画に分岐元として明記されているブランチがあればその名前\n無ければ null',
+      description: 'string: 実装計画に分岐元として明記されているブランチの名前, null: 無ければ',
     },
   },
   required: ['baseBranch'],

@@ -15,7 +15,7 @@ export const ARGS_SCHEMA = {
     screenshots: {
       type: ['array', 'null'],
       items: { type: 'string' },
-      description: '添付するスクリーンショットのローカルファイルパス一覧（無ければ null）',
+      description: 'array: 添付するスクリーンショットのローカルファイルパス一覧, null: 無ければ',
     },
   },
   required: ['workingDir', 'prNumber', 'body', 'screenshots'],

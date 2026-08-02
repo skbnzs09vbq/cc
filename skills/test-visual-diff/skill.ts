@@ -10,7 +10,8 @@ export const ARGS_SCHEMA = {
     workingDir: { type: 'string', description: 'gitリポジトリのディレクトリ' },
     refA: {
       type: ['string', 'null'],
-      description: '比較対象1（コミットハッシュ・ブランチ名等）\nnull なら project.ts の BASE_BRANCH',
+      description:
+        'string: 比較対象1（コミットハッシュ・ブランチ名等）, null: project.ts の BASE_BRANCH を使う',
     },
     refB: { type: 'string', description: '比較対象2（コミットハッシュ・ブランチ名等）' },
     url: {
@@ -20,11 +21,12 @@ export const ARGS_SCHEMA = {
     },
     serverCommand: {
       type: ['string', 'null'],
-      description: '開発サーバー起動コマンド（例: "npm run dev"）\n不要（静的HTML等）なら null',
+      description: 'string: 開発サーバー起動コマンド（例: "npm run dev"）, null: 不要（静的HTML等）な場合',
     },
     port: {
       type: ['integer', 'null'],
-      description: 'サーバーのポート番号\nserverCommand がある場合は必須',
+      description:
+        'integer: サーバーのポート番号（serverCommand がある場合は必須）, null: serverCommand が無い場合',
     },
     expectDiff: {
       type: 'boolean',
@@ -33,7 +35,7 @@ export const ARGS_SCHEMA = {
     expectedArea: {
       type: ['string', 'null'],
       description:
-        '差分が出ることを期待する画面上の箇所の説明（例: "右上の通知アイコン周辺"）\nexpectDiff が true の場合のみ使う\nnull なら差分の有無だけ判定し、箇所までは判定しない',
+        'string: 差分が出ることを期待する画面上の箇所の説明（例: "右上の通知アイコン周辺"、expectDiff が true の場合のみ使う）, null: 差分の有無だけ判定し箇所までは判定しない場合',
     },
   },
   required: ['workingDir', 'refA', 'refB', 'url', 'serverCommand', 'port', 'expectDiff', 'expectedArea'],
@@ -46,7 +48,8 @@ const RESULT_SCHEMA = {
     hasDiff: { type: 'boolean', description: '実際に視覚的な差分があったか' },
     findings: {
       type: ['string', 'null'],
-      description: '期待と異なる場合の具体的な内容（例: 想定外の箇所に差分がある）\n一致していれば null',
+      description:
+        'string: 期待と異なる場合の具体的な内容（例: 想定外の箇所に差分がある）, null: 一致していれば',
     },
     screenshots: {
       type: 'object',

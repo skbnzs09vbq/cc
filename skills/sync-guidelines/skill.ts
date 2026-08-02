@@ -19,7 +19,7 @@ const CANDIDATE_SCHEMA = {
   properties: {
     candidates: {
       type: ['array', 'null'],
-      description: '該当するパターンが1つも見つからない場合は null',
+      description: 'array: 見つかった指針候補一覧, null: 該当するパターンが1つも見つからない場合',
       items: {
         type: 'object',
         properties: {
@@ -52,7 +52,7 @@ const MERGE_SCHEMA = {
     },
     changes: {
       type: ['array', 'null'],
-      description: '変更がなければ null',
+      description: 'array: 今回の更新で追加・更新・統合・削除した指針一覧, null: 変更がなければ',
       items: {
         type: 'object',
         properties: {

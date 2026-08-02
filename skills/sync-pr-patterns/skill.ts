@@ -1,6 +1,14 @@
 import { PR_PATTERNS } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, remember, respond, runCommand, writeFile } from '../_shared/complete.js'
+import {
+  type Schema,
+  complete,
+  generate,
+  remember,
+  respond,
+  runCommand,
+  writeFile,
+} from '../_shared/complete.js'
 import { REPO } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
@@ -45,7 +53,7 @@ export function syncPrPatterns(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 2: コメント収集 ─────────────────────────────────
   phase('コメント収集')
 
-  const allComments = complete(
+  const allComments = generate(
     dedent`
       以下の PR 一覧に含まれる各 PR について、次の2コマンドを実行してコメント・レビューを収集してください
 
@@ -82,7 +90,7 @@ export function syncPrPatterns(args: Infer<typeof ARGS_SCHEMA>): string {
     `cd ${workingDir} && cat ${PR_PATTERNS} 2>/dev/null || echo ""`,
   ])
 
-  const updatedPatterns = complete(
+  const updatedPatterns = generate(
     dedent`
       既存のパターン集と、分類済みの PR コメント・レビューを照合し、パターン集を更新してください
       構造（AI / ヒューマン の2大セクション → カテゴリ番号・見出し形式）は維持してください
@@ -111,7 +119,7 @@ export function syncPrPatterns(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 5: 報告 ───────────────────────────────────────────
   phase('報告')
 
-  return complete(
+  return generate(
     dedent`
       以下の更新前後のパターン集の差分を、追加・変更・削除に分けて要約してください
 

@@ -1,5 +1,13 @@
 import { parseArgs } from '../_shared/args.js'
-import { complete, exit, readFile, remember, respond, writeFile } from '../_shared/complete.js'
+import {
+  complete,
+  exit,
+  generate,
+  readFile,
+  remember,
+  respond,
+  writeFile,
+} from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
 
 const COMMANDS_PATH = '.claude/local/commands.md'
@@ -29,7 +37,7 @@ export function showCommands(input: string): string {
     // ─── Phase 2: commands.md への追記 ────────────────────────────
     phase('commands.md への追記')
 
-    const updated = complete(
+    const updated = generate(
       dedent`
         既存の commands.md に、以下のコマンドを違和感なく追記してください
 

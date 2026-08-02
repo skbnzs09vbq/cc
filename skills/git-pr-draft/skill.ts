@@ -25,7 +25,7 @@ const PR_SCHEMA = {
   required: ['title', 'description'],
 } as const satisfies Schema
 
-export function gitPrDraft(supplement: string): string {
+export function gitPrDraft(supplement: string): { title: string; description: string } {
   remember(['gh pr create や git push は行わないこと'])
 
   // ─── Phase 1: コンテキスト取得 ─────────────────────────────
@@ -86,7 +86,7 @@ export function gitPrDraft(supplement: string): string {
     PR_SCHEMA,
   )
 
-  return pr.description
+  return pr
 }
 
 const supplement = parseArgs()

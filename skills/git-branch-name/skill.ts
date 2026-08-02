@@ -22,12 +22,12 @@ export const ARGS_SCHEMA = {
   properties: {
     workDescription: {
       type: ['string', 'null'],
-      description: 'ブランチ名を決めるための作業内容\n無ければユーザーに確認する',
+      description: 'string: ブランチ名を決めるための作業内容, null: 無ければユーザーに確認する',
     },
     single: {
       type: ['boolean', 'null'],
       description:
-        'true の場合、候補を1つに絞って直接返す\nfalse または null の場合、複数の候補を提示する',
+        'boolean: true なら候補を1つに絞って直接返す・false なら複数の候補を提示する, null: 複数の候補を提示する（false と同じ）',
     },
   },
   required: ['workDescription', 'single'],

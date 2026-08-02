@@ -78,15 +78,7 @@ export function autoDev(): void {
   ]);
 
   const cronList = String(CronList());
-  const alreadyScheduled = complete(
-    dedent`
-      以下は CronList() の実行結果です
-      prompt に "${CRON_PROMPT}" を含むジョブが既に登録されているか判断してください
-
-      ${cronList}
-    `,
-    { type: "boolean" } as const,
-  );
+  const alreadyScheduled = cronList.includes(CRON_PROMPT.split("\n")[0]);
   if (!alreadyScheduled)
     CronCreate({ cron: "* * * * *", prompt: CRON_PROMPT, recurring: true });
 

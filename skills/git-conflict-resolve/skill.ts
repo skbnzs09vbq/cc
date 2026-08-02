@@ -13,7 +13,7 @@ export const ARGS_SCHEMA = {
     workingDir: { type: 'string', description: 'コンフリクト解消を行うディレクトリ' },
     baseBranch: {
       type: ['string', 'null'],
-      description: '取り込む分岐元ブランチ名\n未指定なら project.ts の BASE_BRANCH',
+      description: 'string: 取り込む分岐元ブランチ名, null: 未指定（project.ts の BASE_BRANCH を使う）',
     },
     force: {
       type: 'boolean',
@@ -23,15 +23,16 @@ export const ARGS_SCHEMA = {
     visualCheckUrl: {
       type: ['string', 'null'],
       description:
-        'マージ前後で視覚的デグレが無いか確認するページ\nnull なら視覚チェックを行わない',
+        'string: マージ前後で視覚的デグレが無いか確認するページ, null: 視覚チェックを行わない',
     },
     serverCommand: {
       type: ['string', 'null'],
-      description: '視覚チェック用の開発サーバー起動コマンド\n不要なら null',
+      description: 'string: 視覚チェック用の開発サーバー起動コマンド, null: 不要な場合',
     },
     port: {
       type: ['integer', 'null'],
-      description: '視覚チェック用サーバーのポート番号\nserverCommand がある場合は必須',
+      description:
+        'integer: 視覚チェック用サーバーのポート番号（serverCommand がある場合は必須）, null: serverCommand が無い場合',
     },
   },
   required: ['workingDir', 'baseBranch', 'force', 'visualCheckUrl', 'serverCommand', 'port'],

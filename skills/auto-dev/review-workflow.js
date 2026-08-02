@@ -88,15 +88,9 @@ const STRUCTURED_FINDINGS_SCHEMA = {
 }
 
 const NEW_FINDINGS_SCHEMA = {
-  type: 'object',
-  properties: {
-    findings: {
-      type: 'array',
-      items: FINDING_ITEM_SCHEMA,
-      description: '既存コメントと重複しない、本当に新規の指摘一覧（無ければ空配列）',
-    },
-  },
-  required: ['findings'],
+  type: 'array',
+  items: FINDING_ITEM_SCHEMA,
+  description: '既存コメントと重複しない、本当に新規の指摘一覧（無ければ空配列）',
 }
 
 const AUTO_DEV_NOTE = 'auto-dev workflow からの実行です。ユーザー許可は得た上で呼び出されているので、確認を挟まず実行してください。'
@@ -209,10 +203,10 @@ if (!codeReview.clean) {
     { agentType: 'git-pr-comments-list', phase: 'コードレビュー', label: `pr #${pr.number} 既存コメント取得` }
   )
 
-  const newFindings = (await agent(
-    JSON.stringify({ items: structured.findings, existing: existingComments, similarityLevel: null }),
+  const newFindings = await agent(
+    JSON.stringify({ items: structured.findings, existing: existingComments || '', similarityLevel: null }),
     { agentType: 'dedup-items', phase: 'コードレビュー', label: `pr #${pr.number} 新規指摘の抽出`, schema: NEW_FINDINGS_SCHEMA }
-  )).findings
+  )
 
   newFindingsCount = newFindings.length
 

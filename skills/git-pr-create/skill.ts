@@ -1,19 +1,9 @@
 import { BASE_BRANCH } from '../../local/project.js'
 import { gitPrDraft } from '../git-pr-draft/skill.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, respond, runCommand, writeFile } from '../_shared/complete.js'
+import { type Schema, respond, runCommand, writeFile } from '../_shared/complete.js'
 import { NAME, OWNER, REPO, gitBuildScreenshotsSection } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
-import { dedent } from '../_shared/utils.js'
-
-const PICKED_DRAFT_SCHEMA = {
-  type: 'object',
-  properties: {
-    title: { type: 'string' },
-    description: { type: 'string' },
-  },
-  required: ['title', 'description'],
-} as const satisfies Schema
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -22,34 +12,36 @@ export const ARGS_SCHEMA = {
     head: { type: 'string', description: 'PR の head ブランチ名' },
     base: {
       type: ['string', 'null'],
-      description: '分岐元ブランチ名\n未指定なら null（BASE_BRANCH を使う）',
+      description: 'string: 分岐元ブランチ名, null: 未指定（BASE_BRANCH を使う）',
     },
     title: {
       type: ['string', 'null'],
-      description: 'PR タイトル\n未定なら null（workDescription から git-pr-draft で決定する）',
+      description: 'string: PR タイトル, null: 未定（workDescription から git-pr-draft で決定する）',
     },
     description: {
       type: ['string', 'null'],
-      description: 'PR 本文の Description 部分\ntitle と同様に未定なら null',
+      description: 'string: PR 本文の Description 部分, null: title と同様に未定な場合',
     },
     closesIssue: {
       type: ['integer', 'null'],
-      description: 'この PR が close する issue 番号\nあれば本文冒頭に "Closes #N" を付ける',
+      description:
+        'integer: この PR が close する issue 番号（あれば本文冒頭に "Closes #N" を付ける）, null: 無い場合',
     },
     workDescription: {
       type: ['string', 'null'],
-      description: 'title/description が null の場合に git-pr-draft に渡す実装計画等の説明',
+      description:
+        'string: title/description が null の場合に git-pr-draft に渡す実装計画等の説明, null: 不要な場合',
     },
     additionalBody: {
       type: ['string', 'null'],
       description:
-        '本文末尾に追記する内容（既知の指摘など\nスクリーンショットは screenshots で渡す）',
+        'string: 本文末尾に追記する内容（既知の指摘など、スクリーンショットは screenshots で渡す）, null: 無い場合',
     },
     screenshots: {
       type: ['array', 'null'],
       items: { type: 'string' },
       description:
-        '動作確認時に撮影したスクリーンショットのローカルファイルパス一覧（無ければ null）',
+        'array: 動作確認時に撮影したスクリーンショットのローカルファイルパス一覧, null: 無ければ',
     },
   },
   required: [
@@ -71,17 +63,8 @@ export function gitPrCreate(args: Infer<typeof ARGS_SCHEMA>): string | null {
 
   if (!title || !description) {
     const draft = gitPrDraft(workDescription ?? '')
-    const picked = complete(
-      dedent`
-        以下は PR タイトル・description の下書きです
-        この内容をそのまま採用してください
-
-        ${draft}
-      `,
-      PICKED_DRAFT_SCHEMA,
-    )
-    title = picked.title
-    description = picked.description
+    title = draft.title
+    description = draft.description
   }
 
   const base = args.base ?? BASE_BRANCH

@@ -79,60 +79,43 @@ const SPEC_ITEMS_SCHEMA = {
 }
 
 const EXISTING_ISSUES_SCHEMA = {
-  type: 'object',
-  properties: {
-    issues: {
-      type: 'array',
-      items: { type: 'string' },
-      description: '既存issueの説明文一覧（無ければ空配列）',
-    },
-  },
-  required: ['issues'],
+  type: 'array',
+  items: { type: 'string' },
+  description: '既存issueの説明文一覧（無ければ空配列）',
 }
 
 const GAPS_SCHEMA = {
-  type: 'object',
-  properties: {
-    gaps: {
-      type: 'array',
-      items: { type: 'string' },
-      description: '未対応と判定された項目一覧（無ければ空配列）',
-    },
-  },
-  required: ['gaps'],
+  type: 'array',
+  items: { type: 'string' },
+  description: '未対応と判定された項目一覧（無ければ空配列）',
 }
 
 const PRS_SCHEMA = {
-  type: 'object',
-  properties: {
-    prs: {
-      type: 'array',
-      items: {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      number: { type: 'integer' },
+      title: { type: 'string' },
+      url: { type: 'string' },
+      mergeable: { type: 'string' },
+      state: { type: 'string' },
+      body: { type: ['string', 'null'] },
+      headRefName: { type: 'string' },
+      isDraft: { type: 'boolean' },
+      author: {
         type: 'object',
-        properties: {
-          number: { type: 'integer' },
-          title: { type: 'string' },
-          url: { type: 'string' },
-          mergeable: { type: 'string' },
-          state: { type: 'string' },
-          body: { type: ['string', 'null'] },
-          headRefName: { type: 'string' },
-          author: {
-            type: 'object',
-            properties: { login: { type: 'string' } },
-            required: ['login'],
-          },
-          closesIssue: { type: ['integer', 'null'] },
-        },
-        required: [
-          'number', 'title', 'url', 'mergeable', 'state', 'body',
-          'headRefName', 'author', 'closesIssue',
-        ],
+        properties: { login: { type: 'string' } },
+        required: ['login'],
       },
-      description: '既存PR一覧（無ければ空配列）',
+      closesIssue: { type: ['integer', 'null'] },
     },
+    required: [
+      'number', 'title', 'url', 'mergeable', 'state', 'body',
+      'headRefName', 'isDraft', 'author', 'closesIssue',
+    ],
   },
-  required: ['prs'],
+  description: '既存PR一覧（無ければ空配列）',
 }
 
 // ─── Phase 1: 仕様・現状把握 ─────────────────────────────
@@ -152,25 +135,24 @@ const specItems = (await agent(
   { schema: SPEC_ITEMS_SCHEMA, phase: '仕様・現状把握', label: '仕様項目の抽出' }
 )).items
 
-const existingIssuesResult = await agent(
+const existingIssues = await agent(
   JSON.stringify({ type: null, assigneeOnly: false, structured: false, withDependencies: false }),
   { agentType: 'issue-list', phase: '仕様・現状把握', label: '既存issue確認', schema: EXISTING_ISSUES_SCHEMA }
 )
-const existingIssues = existingIssuesResult.issues
 
 // ─── Phase 2: 次のissue選定 ─────────────────────────────
 phase('次のissue選定')
 
-let gaps = (await agent(
+let gaps = await agent(
   JSON.stringify({ items: specItems, existing: existingIssues, workingDir: null, similarityLevel: 2 }),
   { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '不足機能の判定', schema: GAPS_SCHEMA }
-)).gaps
+)
 
 if (gaps.length === 0) {
-  gaps = (await agent(
+  gaps = await agent(
     JSON.stringify({ items: specItems, existing: null, workingDir: null, similarityLevel: 2 }),
     { agentType: 'find-spec-gaps', phase: '次のissue選定', label: '実装ギャップの判定', schema: GAPS_SCHEMA }
-  )).gaps
+  )
 }
 
 let items = []
@@ -188,10 +170,10 @@ if (gaps.length > 0) {
     { schema: ITEMS_SCHEMA, phase: '次のissue選定', label: 'issue候補の整形' }
   )).items
 } else {
-  const existingPrs = (await agent(
+  const existingPrs = await agent(
     JSON.stringify({ assignee: null, number: null, state: null }),
     { agentType: 'git-pr-list', phase: '次のissue選定', label: '既存PR確認', schema: PRS_SCHEMA }
-  )).prs
+  )
 
   const conflictingPrs = existingPrs.filter((pr) => pr.mergeable === 'CONFLICTING')
 

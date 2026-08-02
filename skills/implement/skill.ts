@@ -29,7 +29,7 @@ export const ARGS_SCHEMA = {
   properties: {
     workingDir: {
       type: ['string', 'null'],
-      description: '実装を行う作業ディレクトリ\n未指定ならカレントディレクトリ',
+      description: 'string: 実装を行う作業ディレクトリ, null: 未指定（カレントディレクトリ）',
     },
     input: {
       type: 'string',

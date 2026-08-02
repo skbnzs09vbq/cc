@@ -24,7 +24,7 @@ const ALREADY_IMPLEMENTED_SCHEMA = {
     },
     summary: {
       type: ['string', 'null'],
-      description: 'implemented が true の場合、その概要\nfalse の場合は null',
+      description: 'string: implemented が true の場合の概要, null: implemented が false の場合',
     },
   },
   required: ['implemented', 'summary'],
@@ -36,7 +36,7 @@ export const ARGS_SCHEMA = {
     input: { type: 'string', description: '自由記述の issue 起票内容（要望・背景等）' },
     shouldContinue: {
       type: ['boolean', 'null'],
-      description: '実装済みの可能性がある場合でも続けるか\n未定なら null（ユーザーに確認する）',
+      description: 'boolean: 実装済みの可能性がある場合でも続けるか, null: 未定（ユーザーに確認する）',
     },
   },
   required: ['input', 'shouldContinue'],
@@ -112,15 +112,11 @@ export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 4: 不足項目の質問 ────────────────────────────────
   phase('不足項目の質問')
 
-  const missingFields = complete(
-    dedent`
-      fields のうち、根拠なく推測でしか埋められない項目を列挙してください
-      すべて確定できていれば null を返してください
-    `,
-    { type: ['array', 'null'], items: { type: 'string' } } as const,
-  )
+  const missingFields = Object.entries(fields)
+    .filter(([, value]) => value === null)
+    .map(([key]) => key)
 
-  if (missingFields) {
+  if (missingFields.length > 0) {
     const ANSWERS_SCHEMA: Schema = {
       type: 'object',
       properties: Object.fromEntries(missingFields.map((f) => [f, { type: 'string' }])),

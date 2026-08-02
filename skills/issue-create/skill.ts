@@ -8,7 +8,7 @@ export const ARGS_SCHEMA = {
   properties: {
     type: {
       type: ['string', 'null'],
-      description: 'タスク管理ツールの種類\n未指定なら project.ts の TASK_TRACKER を使う',
+      description: 'string: タスク管理ツールの種類, null: 未指定（project.ts の TASK_TRACKER を使う）',
     },
     title: { type: 'string', description: 'issue タイトル' },
     body: { type: 'string', description: 'issue 本文（Markdown）' },

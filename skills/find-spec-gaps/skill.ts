@@ -1,7 +1,7 @@
 import { GUIDELINES, PROJECT_ROOT } from '../../local/project.js'
 import { dedupItems } from '../dedup-items/skill.js'
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, readFile, respond } from '../_shared/complete.js'
+import { type Schema, generate, readFile, respond } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -17,18 +17,18 @@ export const ARGS_SCHEMA = {
       type: ['array', 'null'],
       items: { type: 'string' },
       description:
-        '既に存在する・対応済みの項目一覧\nnull の場合、workingDir（未指定なら project.ts の PROJECT_ROOT）/GUIDELINES から実際のコードベースの実装状況を調べて existing の代わりに使う',
+        'array: 既に存在する・対応済みの項目一覧, null: workingDir（未指定なら project.ts の PROJECT_ROOT）/GUIDELINES から実際のコードベースの実装状況を調べて existing の代わりに使う場合',
     },
     workingDir: {
       type: ['string', 'null'],
       description:
-        '実装状況を調査するディレクトリ（worktree 等）\nexisting が null の場合のみ使う\n未指定なら project.ts の PROJECT_ROOT',
+        'string: 実装状況を調査するディレクトリ（worktree 等、existing が null の場合のみ使う）, null: 未指定（project.ts の PROJECT_ROOT を使う）',
     },
     similarityLevel: {
       type: ['integer', 'null'],
       enum: [1, 2, 3, null],
       description:
-        '対応済みとみなす基準の厳しさ（dedup-items にそのまま渡す）\n1: 緩い、2: 標準（既定値）、3: 厳しい\n未指定なら 2',
+        'integer: 対応済みとみなす基準の厳しさ（dedup-items にそのまま渡す。1: 緩い、2: 標準（既定値）、3: 厳しい）, null: 未指定（2 を使う）',
     },
   },
   required: ['items', 'existing', 'workingDir', 'similarityLevel'],
@@ -41,7 +41,7 @@ export function findSpecGaps(args: Infer<typeof ARGS_SCHEMA>): string[] {
   const allExisting = existing
     ? [...existing]
     : [
-        complete(
+        generate(
           dedent`
             プロジェクト ${workingDir} の実際のコードベースを調査し、既に対応・実装されている内容
             （ディレクトリ構成・主要機能ごとの実装状況・TODO・既知の問題等）を箇条書きで簡潔にまとめてください

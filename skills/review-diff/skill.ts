@@ -14,6 +14,7 @@ import {
   type Schema,
   buildCommandPrompt,
   complete,
+  generate,
   respond,
   runCommand,
 } from '../_shared/complete.js'
@@ -35,7 +36,7 @@ const CHECK_RESULT_SCHEMA = {
     findings: {
       type: ['string', 'null'],
       description:
-        'clean が false の場合、出力フォーマットに従って整形した指摘内容\ntrue の場合は null',
+        'string: clean が false の場合の、出力フォーマットに従って整形した指摘内容, null: clean が true の場合',
     },
   },
   required: ['clean', 'findings'],
@@ -101,9 +102,9 @@ export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA
       workspace,
       result: runCommand([
         dedent`
-        cd ${workingDir}/${MONOREPO_APPS_DIR}/${workspace}
-        ${TYPECHECK_COMMAND} 2>&1 | grep -F -f <(printf '%s\\n' ${filesArg}) || echo "変更ファイルに型エラーなし"
-      `,
+          cd ${workingDir}/${MONOREPO_APPS_DIR}/${workspace}
+          ${TYPECHECK_COMMAND} 2>&1 | grep -F -f <(printf '%s\\n' ${filesArg}) || echo "変更ファイルに型エラーなし"
+        `,
       ]),
     }
   })
@@ -117,43 +118,35 @@ export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA
   phase('パターン集・指針照合')
 
   const patternViolations = prPatterns
-    ? Agent({
-        subagent_type: 'general-purpose',
-        description: 'PR レビューパターン集との照合',
-        prompt: dedent`
-      作業ディレクトリ: ${workingDir}
+    ? generate(
+        dedent`
+          以下の差分を PR レビューパターン集の各カテゴリと照合してください
+          推測で指摘せず、明確に該当するコードがある場合のみ報告してください（該当箇所・カテゴリ番号-項目番号・問題点・修正案を1件ずつ）
+          該当がなければ「該当なし」とだけ返してください
 
-      以下の差分を PR レビューパターン集の各カテゴリと照合してください
-      推測で指摘せず、明確に該当するコードがある場合のみ報告してください（該当箇所・カテゴリ番号-項目番号・問題点・修正案を1件ずつ）
-      該当がなければ「該当なし」とだけ返してください
+          パターン集:
+          ${prPatterns}
 
-      パターン集:
-      ${prPatterns}
-
-      差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
-      ${diff}
-    `,
-      })
+          差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
+          ${diff}
+        `,
+      )
     : null
 
   const guidelineViolations = guidelines
-    ? Agent({
-        subagent_type: 'general-purpose',
-        description: '実装指針との照合',
-        prompt: dedent`
-      作業ディレクトリ: ${workingDir}
+    ? generate(
+        dedent`
+          以下の差分を実装指針（guidelines.md）の各指針と照合してください
+          パターン集・指針に記載のない汎用的な指摘（一般的な型エラー・スタイル等）は行わないでください（該当箇所・指針タイトル・問題点・修正案を1件ずつ）
+          該当がなければ「該当なし」とだけ返してください
 
-      以下の差分を実装指針（guidelines.md）の各指針と照合してください
-      パターン集・指針に記載のない汎用的な指摘（一般的な型エラー・スタイル等）は行わないでください（該当箇所・指針タイトル・問題点・修正案を1件ずつ）
-      該当がなければ「該当なし」とだけ返してください
+          指針:
+          ${guidelines}
 
-      指針:
-      ${guidelines}
-
-      差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
-      ${diff}
-    `,
-      })
+          差分（変更ファイル一覧 ${filesArg} にスコープを限定する）:
+          ${diff}
+        `,
+      )
     : null
 
   // ─── Phase 7: code-review スキルによるレビュー ─────────────────

@@ -9,17 +9,17 @@ export const ARGS_SCHEMA = {
     assignee: {
       type: ["string", "null"],
       description:
-        "この GitHub アカウントが作成した PR のみに絞る\n未指定なら全体",
+        "string: この GitHub アカウントが作成した PR のみに絞る, null: 未指定（全体）",
     },
     number: {
       type: ["integer", "null"],
       description:
-        "指定した場合、この PR 番号1件だけを取得する（assignee・state は無視）",
+        "integer: 指定した場合、この PR 番号1件だけを取得する（assignee・state は無視）, null: 指定しない場合",
     },
     state: {
       type: ["string", "null"],
       enum: ["open", "closed", "merged", "all", null],
-      description: "PR の状態フィルタ\n未指定なら open",
+      description: "string: PR の状態フィルタ, null: 未指定（open として扱う）",
     },
   },
   required: ["assignee", "number", "state"],
@@ -44,7 +44,7 @@ const RAW_PR_SCHEMA = {
     closesIssue: {
       type: ["integer", "null"],
       description:
-        '本文の "Closes #N" から抽出した対応issue番号\n無ければ null',
+        'integer: 本文の "Closes #N" から抽出した対応issue番号, null: 無ければ',
     },
   },
   required: [

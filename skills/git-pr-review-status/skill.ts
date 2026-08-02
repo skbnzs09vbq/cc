@@ -1,8 +1,7 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, respond } from '../_shared/complete.js'
+import { type Schema, respond } from '../_shared/complete.js'
 import { gitPrReviewThreads } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
-import { dedent } from '../_shared/utils.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -19,7 +18,7 @@ export const RESULT_SCHEMA = {
     allResolved: {
       type: 'boolean',
       description:
-        'hasComments が true の場合、すべて resolved になっているか（false の場合は true）',
+        'true: hasComments が true かつ全スレッドが resolved、または hasComments が false の場合, false: hasComments が true かつ未解決のスレッドが残っている場合',
     },
   },
   required: ['hasComments', 'allResolved'],
@@ -28,16 +27,14 @@ export const RESULT_SCHEMA = {
 export function gitPrReviewStatus(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SCHEMA> {
   const { prNumber } = args
 
-  const threads = gitPrReviewThreads(prNumber, false)
+  const threadsRaw = gitPrReviewThreads(prNumber, false)
+  const nodes =
+    JSON.parse(threadsRaw || '{}')?.data?.repository?.pullRequest?.reviewThreads?.nodes ?? []
 
-  return complete(
-    dedent`
-      以下は PR #${prNumber} の reviewThreads 取得結果です
-
-      ${threads}
-    `,
-    RESULT_SCHEMA,
-  )
+  return {
+    hasComments: nodes.length > 0,
+    allResolved: nodes.every((n: { isResolved: boolean }) => n.isResolved),
+  }
 }
 
 respond(gitPrReviewStatus(getArgs(ARGS_SCHEMA)))
