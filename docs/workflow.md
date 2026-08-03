@@ -1,4 +1,4 @@
-# Claude Code の Workflow（Dynamic Workflows）とは
+# Claude Code の Workflow とは
 
 公式ドキュメント: <https://code.claude.com/docs/en/workflows>
 
@@ -8,50 +8,63 @@ Workflow は、複数のサブエージェントをオーケストレーショ�
 
 ## メリット
 
-- 複数エージェントを起動できる
-- 流れを定型化できる（再利用・再実行できる）
-- バックグラウンドで実行されるので、セッション自体は操作可能
+- 同時実行数の管理や、早く終わったものから次に進む制御が可能（`parallel`, `pipeline`）
+- 変更してない部分は再実行せず、キャッシュした結果をそのまま使える
+- js として動くので、ループや分岐が毎回同じように正しく動く
 
 ## 個人的な感想
 
 - コード上で schema を定義して結果の型を固定できるので、AIの出力がぶれにくい
-- JS なので日本語の指示文より読む気になる（AIが書く・直すものなのであまり関係ないかも、、）
+- js なので日本語の指示文より読む気になる（AIが書く・直すものなのであまり関係ないかも、、）
+
+## 呼び出し方
+
+workflow の js を用意し、それを 実行するように skill に指示を書き、その skill を実行する
 
 ## 主なAPI
 
+- `phase(title)` — 進捗表示
+
+    ```js
+    phase('監査')
+    ```
+
 - `agent(prompt, opts?)` — サブエージェントを起動
 
-  ```javascript
-  const result = await agent('src/routes/ 配下の .ts ファイル一覧を返して')
-  ```
+    ```js
+    const result = await agent('src/routes/ 配下の .ts ファイル一覧を返して')
+    ```
 
-- `parallel(thunks)` — 複数タスクを同時実行し、全て揃うまで待つ。同じ処理を複数件に一括で流すだけのとき
+- `parallel(thunks)` — 複数タスクを同時実行
 
-  ```javascript
-  await parallel([
-    () => agent('a.ts を直して'),
-    () => agent('b.ts を直して'),
-    () => agent('c.ts を直して'),
-  ])
-  ```
+    ```js
+    await parallel([
+        () => agent('a.ts を直して'),
+        () => agent('b.ts を直して'),
+        () => agent('c.ts を直して'),
+    ])
+    ```
 
-- `pipeline(items, ...stages)` — `items` から1件ずつ取り出し、その1件が `stages` を順に通る
-  恩恵が出るのは items が複数あるときだけ  
-  items が1件しかないなら素の `await agent(...)` を並べるのと結果は同じなので、`pipeline([item], ...)` にする必要はない  
+- `pipeline(items, ...stages)` — 早く終わった item から順に次の段へ進む
 
-  ```javascript
-  await pipeline(
-    files,
-    file => agent(`${file} の問題点を調査して`),                    // 1段目: 調査結果(findings)を返す
-    (findings, file) => agent(`${file} を次の内容で修正して: ${findings}`), // 2段目: 前段の結果 と 元のfile を両方使う
-  )
-  ```
+    調査結果が全てそろってから、修正を始める
 
-- `phase(title)` — 進捗表示上のグループ分け
+    ```js
+    const findings = await parallel(files.map(file => () => agent(`${file}を調査`)))
+    const fixed = await parallel(files.map((file, i) => () => agent(`${file}を修正: ${findings[i]}`)))
+    ```
 
-  ```javascript
-  phase('監査')
-  ```
+    ↓
+
+    調査結果がそろったものから、修正を始める
+
+    ```js
+    await pipeline(
+        files,
+        file => agent(`${file} の問題点を調査して`),
+        (findings, file) => agent(`${file} を次の内容で修正して: ${findings}`),
+    )
+    ```
 
 ## 制約
 
@@ -59,25 +72,24 @@ Workflow は、複数のサブエージェントをオーケストレーショ�
     - ステージごとに承認を挟みたい場合は workflow を分割 or skill で作成
 - スクリプトから直接 `Skill()` は呼べない
     - `agent()` のプロンプトで「〇〇スキルを実行して」と指示
-    - skill を実行させる sub agent を用意しておき、その　agent を起動させる
+    - skill を実行させる sub agent を用意しておき、その agent を起動させる
 - 同時実行は最大16件
 
 ## 注意点
 
 - 通常の会話より多くのエージェントを起動するため、トークン消費が大きくなりがち
 
-## CronCreate（定期実行）
-
-Workflow を定期的に起動する仕組み。cron式（5フィールド、ローカル時間）で `prompt` を指定時刻ごとに再投入する
-
-- セッション限りで、ディスクには保存されない（Claude Codeを再起動すると消える）
-- `recurring: true`（既定）で繰り返し、`false` なら次回1回だけ実行して自動削除
-- 繰り返しジョブは登録から7日で自動的に失効する（最後に1回だけ発火してから削除される）
-- 発火するのは REPL がアイドルな時のみ（クエリ実行中は待たされる）
-
-`auto-dev` の `skill.ts` はこれを使い、未登録なら「毎分このスキルを実行して」という cron を自分で作成する。7日で失効するため、セッションが長引く場合は再登録が必要になる
-
 ## 例
+
+issue の計画から PR 作成までの workflow
+
+├── 計画立案  
+├── ブランチ作成  
+├── 実装  
+├── レビュー・E2E検証  
+└── commit・PR作成  
+
+## 複数例
 
 issue の作成から実装・レビュー・マージまで、役割ごとに分かれた workflow が AI だけで自走する
 
@@ -90,31 +102,37 @@ issue の作成から実装・レビュー・マージまで、役割ごとに�
 - レビュー者: `review-workflow.js`  
     PR をレビューし、問題なければマージ  
 
-skill.ts（状態管理・workflow の管理を行う）
+```mermaid
+flowchart TD
+    UserPrompt["呼び出し<br/>（ユーザー）"] --> Cron["cron<br/>（毎分実行）"]
+    Cron --> SkillTs["状況を見て適切な workflow を動かす<br/>（skill）"]
 
-- cron 登録確認  
-    - 未登録なら、毎分 workflow を実行する cron を作成  
-- 状態読み込み  
-    - 実行中タスクがまだ動いているか確認  
-- 起動判定  
-    - 実行中件数が上限未満か確認（上限なら今回は起動しない）  
-    - 担当issue・自分のopen PRを集め、依存未解決・既に対応中・既存PRがあるものを除外  
-    - 優先順位ルール（決定木、上から順に最初に条件を満たしたもの1件だけを選ぶ）  
-        1. high優先度で対応可能なPRがあればレビューへ  
-        2. high優先度のPRが無く、対応可能なPRがあればレビューへ  
-        3. 未解決の指摘があるPRがあれば修正対応へ（high優先）  
-        4. 対応可能なissueがあれば実装へ（high優先）  
-        5. direction実行中が0件、かつopen issueがDIRECTION_MAX_OPEN_ISSUES件未満ならissue起票へ  
-- workflow 起動  
-    - 選ばれたPR/issueに応じてworktreeを用意し、対応する workflow を起動  
+    SkillTs --> IW0["実装者<br/>（implement-workflow.js）"]
+    IW0 --> IW1[計画を立てる] --> IW2[実装する] --> IW3[レビューして直す] --> IW4[PRを作る]
 
-implement-workflow.js（skill.ts が選んだ issue 1件を処理する）  
+    SkillTs --> PC0["修正者<br/>（address-comments-workflow.js）"]
+    PC0 --> PC1[PRの指摘に対応する] --> PC2[動作確認する] --> PC3[PRに返信する]
+
+    SkillTs --> PR0["レビュー者<br/>（review-workflow.js）"]
+    PR0 --> PR1[PRをレビューする] --> PR2[問題なければマージする]
+
+    SkillTs --> DW0["チケット作成者<br/>（roadmap-workflow.js）"]
+    DW0 --> DW1[仕様と実装状況を調べる] --> DW2[足りないissueを作る]
+```
+
+### CronCreate（定期実行）
+
+指定した時刻ごとに `prompt` を再投入する仕組み
+
+## 各workflowの詳細
+
+implement-workflow.js（skill が選んだ issue 1件を処理する）  
 ├── 計画立案  
 │   ├── `plan-issue` に issue URL を渡し実装計画を作成  
 │   └── 中止判定なら終了  
 ├── ブランチ作成  
 │   ├── `git-branch-name` で計画からブランチ名を決定  
-│   └── skill.ts が起動時に渡した worktree でブランチ切り替え  
+│   └── skill が起動時に渡した worktree でブランチ切り替え  
 ├── 実装  
 │   └── `implement` に計画を渡して worktree 内で実装  
 ├── レビュー・E2E検証（最大 maxIterations 回）  
@@ -128,7 +146,7 @@ implement-workflow.js（skill.ts が選んだ issue 1件を処理する）
     ├── `git-pr-draft` で PR文面を作成  
     └── PR作成  
 
-address-comments-workflow.js（skill.ts が選んだ PR 1 件を処理する）  
+address-comments-workflow.js（skill が選んだ PR 1 件を処理する）  
 └── PR対応  
     ├── `git-pr-resolve-comments` に PR URL を渡し指摘に対応  
     ├── `test-e2e` で対応内容を動作確認  
@@ -137,7 +155,7 @@ address-comments-workflow.js（skill.ts が選んだ PR 1 件を処理する）
     ├── push  
     └── PR に対応内容を返信  
 
-review-workflow.js（skill.ts が選んだ open PR 1件をレビューする）  
+review-workflow.js（skill が選んだ open PR 1件をレビューする）  
 ├── 状態確認  
 │   ├── レビュースレッドの resolved 状況を確認  
 │   └── 未解決の指摘があれば、最新コミットが対応できているか確認し、できていればスレッドを resolve  
@@ -160,23 +178,3 @@ roadmap-workflow.js（毎回1件、次の issue を作成する）
 └── issue作成  
     ├── 不足項目一覧から issue 候補（title・description・rationale・priority）を生成  
     └── `issue-create` で作成・アサイン  
-
-上のフローを1枚にまとめたもの:
-
-```mermaid
-flowchart TD
-    UserPrompt["ユーザーからの呼び出し"] --> SkillTs
-    Cron["cron<br/>（毎分実行）"] --> SkillTs["状況を見て適切な workflow を動かす<br/>（skill.ts）"]
-
-    SkillTs --> IW0["実装者<br/>（implement-workflow.js）"]
-    IW0 --> IW1[計画を立てる] --> IW2[実装する] --> IW3[レビューして直す] --> IW4[PRを作る]
-
-    SkillTs --> PC0["修正者<br/>（address-comments-workflow.js）"]
-    PC0 --> PC1[PRの指摘に対応する] --> PC2[動作確認する] --> PC3[PRに返信する]
-
-    SkillTs --> PR0["レビュー者<br/>（review-workflow.js）"]
-    PR0 --> PR1[PRをレビューする] --> PR2[問題なければマージする]
-
-    SkillTs --> DW0["チケット作成者<br/>（roadmap-workflow.js）"]
-    DW0 --> DW1[仕様と実装状況を調べる] --> DW2[足りないissueを作る]
-```
