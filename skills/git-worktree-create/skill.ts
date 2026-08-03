@@ -1,5 +1,6 @@
 import {
   BASE_BRANCH,
+  MONOREPO_APPS_DIR,
   PROJECT_ROOT,
   TICKET_PREFIX,
   WORKTREE_SETUP_COMMANDS,
@@ -28,8 +29,6 @@ const ARGS_SCHEMA = {
 
 export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
   const { issueNumber, branch } = args
-  // 絶対パスで返す: 呼び出し元（サブエージェント）の cwd が想定とずれていても
-  // worktree の場所が一意に定まるようにするため（相対パスだと cwd 汚染時に誤った場所を指しうる）
   const worktreePath = `${PROJECT_ROOT}/${WORKTREE_DIR}/${TICKET_PREFIX || 'issue'}-${issueNumber}`
 
   const list = runCommand(['git worktree list --porcelain']) || ''
@@ -51,6 +50,12 @@ export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
       `[ -f ${PROJECT_ROOT}/.claude/local/guidelines.md ] && cp ${PROJECT_ROOT}/.claude/local/guidelines.md ${worktreePath}/.claude/local/guidelines.md || true`,
       `[ -f ${PROJECT_ROOT}/.claude/local/pr-review-patterns.md ] && cp ${PROJECT_ROOT}/.claude/local/pr-review-patterns.md ${worktreePath}/.claude/local/pr-review-patterns.md || true`,
     ])
+
+    if (MONOREPO_APPS_DIR) {
+      runCommand([
+        `cd ${PROJECT_ROOT} && git ls-files --others --ignored --exclude-standard -- ${MONOREPO_APPS_DIR} | grep -E '(^|/)\\.env($|\\.)' | while read -r f; do mkdir -p "${worktreePath}/$(dirname "$f")" && cp "${PROJECT_ROOT}/$f" "${worktreePath}/$f"; done`,
+      ])
+    }
 
     if (WORKTREE_SETUP_COMMANDS.length > 0) {
       runCommand(
