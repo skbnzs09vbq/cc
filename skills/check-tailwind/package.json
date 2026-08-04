@@ -1,0 +1,10 @@
+{
+  "name": "check-tailwind-skill",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "eslint": "^9",
+    "eslint-plugin-better-tailwindcss": "^4",
+    "typescript-eslint": "^8"
+  }
+}

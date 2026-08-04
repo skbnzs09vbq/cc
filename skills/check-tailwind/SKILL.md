@@ -1,6 +1,6 @@
 ---
 name: check-tailwind
-description: 指定ディレクトリの差分（origin/BASE_BRANCH との比較）から、Tailwind の arbitrary value（px 指定・aspect比指定）が使われていないか検出する。
+description: 指定ディレクトリの差分から、Tailwind のクラスをより簡潔な canonical 表記に置き換え可能でないか検出する。
 argument-hint: "workingDir: <ディレクトリ>"
 user-invocable: true
 model: haiku

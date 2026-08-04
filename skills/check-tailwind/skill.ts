@@ -12,6 +12,8 @@ export const ARGS_SCHEMA = {
   required: ['workingDir'],
 } as const satisfies Schema
 
+const SKILL_DIR = '.claude/skills/check-tailwind'
+
 export function checkTailwind(args: Infer<typeof ARGS_SCHEMA>): string {
   const { workingDir } = args
 
@@ -19,16 +21,26 @@ export function checkTailwind(args: Infer<typeof ARGS_SCHEMA>): string {
     runCommand([
       dedent`
         cd ${workingDir}
-        git diff ${BASE_BRANCH}...HEAD -- '*.ts' '*.tsx' | grep '^+' | node -e '
-        const px = /\\b(w|h|p[xytrbl]?|m[xytrbl]?|gap(?:-[xy])?|size|top|bottom|left|right|inset(?:-[xy])?|min-[wh]|max-[wh]|space-[xy])-\\[(\\d+)px\\]/g;
-        const aspect = /\\baspect-\\[(\\d+)\\/(\\d+)\\]/g;
-        let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
-          const found = new Map();
-          for (const m of s.matchAll(px)) { const v = Number((+m[2] / 4).toFixed(4)); found.set(m[0], \`\${m[1]}-\${v}\`); }
-          for (const m of s.matchAll(aspect)) found.set(m[0], \`aspect-\${m[1]}/\${m[2]}\`);
-          if (found.size === 0) console.log("Tailwind arbitrary value: 指摘なし ✓");
-          else for (const [k, v] of found) console.log(\`\${k} → \${v}\`);
-        });'
+        mb=$(git merge-base ${BASE_BRANCH} HEAD)
+        untracked=$(git ls-files --others --exclude-standard -- '*.ts' '*.tsx')
+        if [ -n "$untracked" ]; then
+          git add -N -- $untracked
+          trap 'git reset -- $untracked >/dev/null 2>&1' EXIT
+        fi
+        changed=$(git diff --name-only "$mb" -- '*.ts' '*.tsx')
+        if [ -z "$changed" ]; then
+          echo "Tailwind arbitrary value: 対象ファイルなし ✓"
+          exit 0
+        fi
+        diff_file=$(mktemp)
+        git diff --unified=0 "$mb" -- '*.ts' '*.tsx' > "$diff_file"
+        ${SKILL_DIR}/node_modules/.bin/eslint \\
+          --config ${SKILL_DIR}/eslint.config.js \\
+          --no-warn-ignored \\
+          --format json \\
+          $changed \\
+          | node ${SKILL_DIR}/report.mjs "$diff_file"
+        rm -f "$diff_file"
       `,
     ]) || 'Tailwind arbitrary value: 指摘なし ✓'
   )
