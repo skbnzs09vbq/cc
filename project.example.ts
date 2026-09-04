@@ -18,6 +18,9 @@ export const PROJECT_ROOT = '/path/to/project'
 /** git-worktree-create が新規 worktree 作成後にフォルダを追加する VSCode の .code-workspace ファイルの絶対パス（任意）。空文字なら何もしない */
 export const VSCODE_WORKSPACE_FILE = ''
 
+/** git-worktree-create が新規 worktree 作成後に herdr worktree open で workspace に追加するか（herdr 未使用ならデフォルトの false のまま） */
+export const USE_HERDR_WORKSPACE = false
+
 /** タスク管理ツールの種類 */
 export const TASK_TRACKER: 'notion' | 'github' | 'linear' | 'backlog' | '' = 'github'
 
@@ -41,6 +44,15 @@ export const TASK_DIR = '.claude/local/tasks/'
 
 /** git-worktree-create が新規 worktree 作成後に順番に実行するセットアップコマンド一覧（依存インストール・ビルド等）。空配列なら何も実行しない */
 export const WORKTREE_SETUP_COMMANDS: string[] = []
+
+/** dev-server スキルが起動に使うコマンド */
+export const DEV_COMMAND = 'npm run dev'
+
+/** dev-server スキルが使う dev ポート一覧。生死判定・停止（fuser -k）の両方に使う */
+export const DEV_PORTS: number[] = []
+
+/** dev-server スキルが停止時に追加で実行するコマンド（任意、DEV_PORTS の kill 以外に必要な後始末があれば） */
+export const DEV_STOP_COMMAND: string | null = null
 
 /** lint コマンド。{files} は変更ファイル一覧 */
 export const LINT_COMMAND = 'npx eslint {files}'

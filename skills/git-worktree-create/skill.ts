@@ -3,12 +3,14 @@ import {
   MONOREPO_APPS_DIR,
   PROJECT_ROOT,
   TICKET_PREFIX,
+  USE_HERDR_WORKSPACE,
   WORKTREE_SETUP_COMMANDS,
 } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import { type Schema, respond, runCommand } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { addWorkspaceFolder } from '../_shared/vscode-workspace.js'
+import { openHerdrWorkspace } from '../herdr/open-herdr-workspace/skill.js'
 
 const WORKTREE_DIR = '.claude/local/worktrees'
 
@@ -21,18 +23,28 @@ const ARGS_SCHEMA = {
     },
     branch: {
       type: ['string', 'null'],
-      description: 'string: チェックアウトする既存ブランチ名, null: 新規 issue 対応でまだ無い場合',
+      description:
+        'string: チェックアウトする既存ブランチ名（＝対応する PR が存在する）, null: 新規 issue 対応でまだ無い場合',
     },
   },
   required: ['issueNumber', 'branch'],
 } as const satisfies Schema
 
-export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
+export type GitWorktreeCreateResult = {
+  worktreePath: string
+  agentName: string | null
+}
+
+export function gitWorktreeCreate(
+  args: Infer<typeof ARGS_SCHEMA>,
+): GitWorktreeCreateResult {
   const { issueNumber, branch } = args
   const worktreePath = `${PROJECT_ROOT}/${WORKTREE_DIR}/${TICKET_PREFIX || 'issue'}-${issueNumber}`
 
   const list = runCommand(['git worktree list --porcelain']) || ''
   const alreadyExists = list.includes(worktreePath)
+
+  let agentName: string | null = null
 
   if (!alreadyExists) {
     runCommand(
@@ -64,9 +76,13 @@ export function gitWorktreeCreate(args: Infer<typeof ARGS_SCHEMA>): string {
     }
 
     addWorkspaceFolder(worktreePath, `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`)
+
+    if (USE_HERDR_WORKSPACE) {
+      agentName = openHerdrWorkspace({ issueNumber, branch, worktreePath })
+    }
   }
 
-  return worktreePath
+  return { worktreePath, agentName }
 }
 
 respond(gitWorktreeCreate(getArgs(ARGS_SCHEMA)))

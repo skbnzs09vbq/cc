@@ -158,7 +158,7 @@ export function autoDev(): void {
   }
 
   function launchPr(pr: PrCandidate, kind: "review" | "address-comments") {
-    const worktreePath = gitWorktreeCreate({
+    const { worktreePath } = gitWorktreeCreate({
       issueNumber: pr.issueNumber,
       branch: pr.headRefName,
     });
@@ -214,7 +214,7 @@ export function autoDev(): void {
   } else if (filteredIssues.length > 0) {
     const issue =
       filteredIssues.find((i) => i.priority === "high") ?? filteredIssues[0];
-    const worktreePath = gitWorktreeCreate({
+    const { worktreePath } = gitWorktreeCreate({
       issueNumber: issue.number,
       branch: null,
     });

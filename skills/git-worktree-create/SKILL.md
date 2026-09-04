@@ -1,6 +1,6 @@
 ---
 name: git-worktree-create
-description: issue番号をキーに worktree を作成する（既にあれば再利用）。branch を指定すれば既存ブランチをチェックアウトし、無指定なら BASE_BRANCH から新規作成する。作成した worktree のパスを返す。
+description: issue番号をキーに worktree を作成する（既にあれば再利用）。branch を指定すれば既存ブランチをチェックアウトし、無指定なら BASE_BRANCH から新規作成する。作成した worktree のパスと herdr agent 名を返す。
 argument-hint: "issueNumber: <issue番号>, branch: <既存ブランチ名 or null>"
 user-invocable: true
 model: haiku
