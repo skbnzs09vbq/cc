@@ -92,6 +92,34 @@ export function toMarkdown(scenarios: TestScenario[]): string {
   `
 }
 
+export function parseMarkdown(markdown: string): TestScenario[] {
+  return markdown
+    .split(/^## /m)
+    .slice(1)
+    .flatMap((block) => {
+      const lines = block.split('\n')
+      const header = lines[0].match(/^\d+\.\s*\[(UI|API)\/([^\]]+)\]\s*(.+)$/)
+      if (!header) return []
+
+      const [, layer, category, title] = header
+      const find = (label: string) =>
+        lines.find((l) => l.startsWith(`- ${label}: `))?.slice(`- ${label}: `.length) ?? ''
+
+      return [
+        {
+          title: title.trim(),
+          layer: layer as TestScenario['layer'],
+          category: category.trim() as TestScenario['category'],
+          precondition: find('前提'),
+          steps: lines
+            .filter((l) => /^\s+\d+\.\s/.test(l))
+            .map((l) => l.replace(/^\s+\d+\.\s/, '')),
+          expected: find('期待'),
+        },
+      ]
+    })
+}
+
 export function testScenario(args: Infer<typeof ARGS_SCHEMA>): TestScenarioResult {
   const { content } = args
   const workingDir = args.workingDir ?? '.'

@@ -1,10 +1,10 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, readFile, respond } from '../_shared/complete.js'
+import { type Schema, readFile, respond } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { boxTable, dedent } from '../_shared/utils.js'
 import { testE2e } from '../test-e2e/skill.js'
 import { E2E_SCREENSHOT_DIR, TEST_SCENARIO_PATH } from '../_shared/paths.js'
-import { SCENARIOS_SCHEMA, testScenario } from '../test-scenario/skill.js'
+import { parseMarkdown, testScenario } from '../test-scenario/skill.js'
 import { testApi } from '../tests/test-api/skill.js'
 
 export const ARGS_SCHEMA = {
@@ -52,17 +52,8 @@ export function testRun(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
   phase('シナリオ取得')
 
   const saved = readFile(`${workingDir}/${TEST_SCENARIO_PATH}`)
-  const scenarios = saved
-    ? complete(
-        dedent`
-          以下は既に洗い出し済みのテストシナリオです
-          記載内容をそのまま構造化して返してください（内容の追加・削除・変更はしないこと）
-
-          ${saved}
-        `,
-        SCENARIOS_SCHEMA,
-      )
-    : testScenario({ workingDir, content }).scenarios
+  const parsed = saved ? parseMarkdown(saved) : []
+  const scenarios = parsed.length ? parsed : testScenario({ workingDir, content }).scenarios
 
   const apiScenarios = scenarios.filter((s) => s.layer === 'API')
   const uiScenarios = scenarios.filter((s) => s.layer === 'UI')

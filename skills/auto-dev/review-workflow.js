@@ -71,8 +71,25 @@ const CHECK_SCHEMA = {
       type: ['string', 'null'],
       description: 'clean が false の場合、出力フォーマットに従って整形した指摘内容。true の場合は null',
     },
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          source: { type: 'string' },
+          severity: { type: 'string', enum: ['must', 'should', 'nit'] },
+          title: { type: 'string' },
+          file: { type: 'string' },
+          line: { type: ['integer', 'null'] },
+          problem: { type: 'string' },
+          fix: { type: 'string' },
+        },
+        required: ['source', 'severity', 'title', 'file', 'line', 'problem', 'fix'],
+      },
+      description: '構造化した指摘一覧（無ければ空配列）',
+    },
   },
-  required: ['clean', 'findings'],
+  required: ['clean', 'findings', 'items'],
 }
 
 const STRUCTURED_FINDINGS_SCHEMA = {

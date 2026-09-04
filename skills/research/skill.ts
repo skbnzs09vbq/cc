@@ -3,19 +3,6 @@ import { parseArgs } from '../_shared/args.js'
 import { type Schema, askUser, complete, generate, remember, respond } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
 
-const OUTPUT_FORMAT = dedent`
-  ## 調査テーマ: {テーマ}
-
-  ### {ソース1のタイトル}
-  {関連情報の要点\nSlack の場合は日時・投稿者も記載\nなければ「関連情報なし」}
-
-  ### {ソース2のタイトル}
-  {関連情報の要点\nなければ「関連情報なし」}
-
-  ### まとめ
-  {全ソースを横断して分かったこと・未解決の点を簡潔にまとめる}
-`
-
 const FINDING_SCHEMA = {
   type: 'array',
   items: {
@@ -26,7 +13,8 @@ const FINDING_SCHEMA = {
       label: { type: ['string', 'null'] },
       result: {
         type: ['string', 'null'],
-        description: 'string: 検索・取得結果, null: 対応するツールが見つからない・取得できない場合',
+        description:
+          'string: 検索・取得結果の要点（Slack の場合は日時・投稿者も記載する）, null: 対応するツールが見つからない・取得できない場合',
       },
     },
     required: ['type', 'value', 'label', 'result'],
@@ -55,26 +43,41 @@ export function research(topic: string): string {
     FINDING_SCHEMA,
   )
 
-  // ─── Phase 2: 出力フォーマットへの整形 ────────────────────────
-  phase('出力フォーマットへの整形')
+  // ─── Phase 2: 横断まとめの作成 ────────────────────────────────
+  phase('横断まとめの作成')
 
-  return generate(
+  const summary = generate(
     dedent`
-      以下の調査結果を、ソース別サマリー形式に整形してください
+      以下のソース別の調査結果を横断して、分かったこと・未解決の点を簡潔にまとめてください
+      見出しは付けず、本文だけを返してください
 
       調査テーマ: ${topic}
 
       ソース別結果:
       ${JSON.stringify(findings)}
-
-      RESEARCH_SOURCES の各行に対してセクションを1つ出力する\nセクションタイトルは
-      "### <種別> <値の説明>" とする（label があれば使う）\n最後に全ソースを横断した
-      "### まとめ" セクションを追加する
-
-      出力フォーマット:
-      ${OUTPUT_FORMAT}
     `,
   )
+
+  // ─── Phase 3: 出力フォーマットへの整形 ────────────────────────
+  phase('出力フォーマットへの整形')
+
+  const sections = findings.map((f) =>
+    dedent`
+      ### ${f.type} ${f.label ?? f.value}
+
+      ${f.result || '関連情報なし'}
+    `,
+  )
+
+  return dedent`
+    ## 調査テーマ: ${topic}
+
+    ${sections.join('\n\n')}
+
+    ### まとめ
+
+    ${summary}
+  `
 }
 
 // ─── Phase 0: テーマ確認 ─────────────────────────────────────

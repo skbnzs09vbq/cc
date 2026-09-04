@@ -5,7 +5,7 @@ import {
   type Schema,
   askUser,
   complete,
-  generate,
+  exit,
   remember,
   respond,
   runCommand,
@@ -71,10 +71,12 @@ export function gitPrResolveComments(args: Infer<typeof ARGS_SCHEMA>): string {
 
   const input = args.url || askUser('対象の GitHub PR URL を教えてください')
 
-  const prNumber = generate(`"${input}" から PR 番号を抽出してください`)
+  const matched = input.match(/(?:\/pull\/|#|^)(\d+)/)
+  if (!matched) exit(`"${input}" から PR 番号を読み取れませんでした`)
+  const prNumber = Number(matched[1])
 
-  const reviewComments = gitPrCommentsList({ prNumber: Number(prNumber) })
-  const reviews = gitPrReviews(Number(prNumber))
+  const reviewComments = gitPrCommentsList({ prNumber })
+  const reviews = gitPrReviews(prNumber)
 
   // ─── Phase 2: カテゴリ分け・提示 ───────────────────────────
   phase('カテゴリ分け・提示')

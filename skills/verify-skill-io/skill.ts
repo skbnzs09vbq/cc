@@ -1,5 +1,5 @@
 import { getArgs } from '../_shared/args.js'
-import { type Schema, complete, generate, respond, runCommand } from '../_shared/complete.js'
+import { type Schema, complete, respond, runCommand } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -36,12 +36,29 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 2: 呼び出し関係の収集 ─────────────────────────────
   phase('呼び出し関係の収集')
 
-  const skillSources = runCommand([
-    `cd .claude && git ls-files -z skills/*/skill.ts | sort -z | xargs -0 -I{} sh -c 'echo "=== {} ==="; cat "{}"'`,
-  ])
-
   const workflowSources = runCommand([
     `cd .claude && git ls-files -z skills/auto-dev/*.js | sort -z | xargs -0 -I{} sh -c 'echo "=== {} ==="; cat "{}"'`,
+  ])
+
+  const calledSkills = [
+    ...new Set(
+      [...(workflowSources ?? '').matchAll(/agentType: '([^']+)'|Skill\('([^']+)'/g)].map(
+        (m) => m[1] ?? m[2],
+      ),
+    ),
+  ]
+
+  const missing = calledSkills.filter(
+    (name) => runCommand([`test -f .claude/skills/${name}/skill.ts && echo yes || echo no`]) === 'no',
+  )
+
+  const skillSources = runCommand([
+    dedent`
+      cd .claude
+      for name in ${calledSkills.join(' ')}; do
+        [ -f "skills/$name/skill.ts" ] && { echo "=== skills/$name/skill.ts ==="; cat "skills/$name/skill.ts"; }
+      done
+    `,
   ])
 
   // ─── Phase 3: 意味的な突合 ───────────────────────────────────
@@ -61,11 +78,10 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
         フィールド名・必須/任意・型のいずれかで一致していない
       - agent() の prompt / Skill() の引数が、呼び出し先 skill の ARGS_SCHEMA の required な
         プロパティを過不足なく供給できていない（明らかに欠けている・型が違う場合のみ）
-      - agentType / Skill 名が実在する skill フォルダを指していない
 
       推測での指摘はせず、実際にコードを読み比べて明確に不一致と判断できるものだけ報告してください（無ければ空配列）
 
-      skill.ts 一覧:
+      呼び出し先の skill.ts:
       ${skillSources}
 
       workflow.js 一覧:
@@ -77,36 +93,33 @@ export function verifySkillIo(_args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 4: 報告 ───────────────────────────────────────────
   phase('報告')
 
-  const OUTPUT_TEMPLATE = dedent`
+  const missingSection = missing.length
+    ? `\n### 実在しない呼び出し先\n\n${missing.map((name) => `- ${name}: skills/${name}/skill.ts が存在しない`).join('\n')}\n`
+    : ''
+
+  const findingsSection = findings.length
+    ? findings
+        .map((f) =>
+          dedent`
+            #### ${f.targetSkill} 呼び出し（${f.file}${f.line ? `:${f.line}` : ''}）
+            - 呼び出し: ${f.callSite}
+            - 不一致: ${f.issue}
+          `,
+        )
+        .join('\n\n')
+    : '不一致なし ✓'
+
+  return dedent`
     ## verify-skill-io チェック結果
 
     ### tsc（直接 import 経由の呼び出し）
 
-    {tsc の結果\nエラー無しならその旨}
-
+    ${tscResult}
+    ${missingSection}
     ### agent()/Skill() 経由の呼び出し（意味的チェック）
 
-    #### {targetSkill} 呼び出し（{file}:{line}）
-    - 呼び出し: {callSite}
-    - 不一致: {issue}
-
-    問題が無ければ「不一致なし ✓」とだけ書く
+    ${findingsSection}
   `
-
-  return generate(
-    dedent`
-      以下の結果を、出力フォーマットのテンプレートに従って1つのレポートに整形してください
-
-      tsc の結果:
-      ${tscResult}
-
-      agent()/Skill() 呼び出しの不一致一覧:
-      ${JSON.stringify(findings)}
-
-      出力フォーマット（テンプレート）:
-      ${OUTPUT_TEMPLATE}
-    `,
-  )
 }
 
 respond(verifySkillIo(getArgs(ARGS_SCHEMA)))

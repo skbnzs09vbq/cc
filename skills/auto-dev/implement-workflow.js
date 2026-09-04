@@ -51,8 +51,25 @@ const CHECK_SCHEMA = {
   properties: {
     clean: { type: 'boolean' },
     findings: { type: ['string', 'null'] },
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          source: { type: 'string' },
+          severity: { type: 'string', enum: ['must', 'should', 'nit'] },
+          title: { type: 'string' },
+          file: { type: 'string' },
+          line: { type: ['integer', 'null'] },
+          problem: { type: 'string' },
+          fix: { type: 'string' },
+        },
+        required: ['source', 'severity', 'title', 'file', 'line', 'problem', 'fix'],
+      },
+      description: '構造化した指摘一覧（無ければ空配列）',
+    },
   },
-  required: ['clean', 'findings'],
+  required: ['clean', 'findings', 'items'],
 }
 
 const E2E_SCHEMA = {
@@ -60,13 +77,27 @@ const E2E_SCHEMA = {
   properties: {
     clean: { type: 'boolean' },
     findings: { type: ['string', 'null'] },
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          passed: { type: 'boolean' },
+          detail: { type: 'string' },
+          screenshot: { type: ['string', 'null'] },
+        },
+        required: ['title', 'passed', 'detail', 'screenshot'],
+      },
+      description: 'シナリオごとの検証結果（scenarioTitles が null の場合は空配列）',
+    },
     screenshots: {
       type: 'array',
       items: { type: 'string' },
       description: '動作確認時に取得したスクリーンショットのファイルパス一覧（なければ空配列）',
     },
   },
-  required: ['clean', 'findings', 'screenshots'],
+  required: ['clean', 'findings', 'results', 'screenshots'],
 }
 
 const { issue, worktreePath, maxIterations } = typeof args === 'string' ? JSON.parse(args) : args
@@ -126,6 +157,7 @@ for (let i = 0; i < maxIterations; i++) {
       JSON.stringify({
         workingDir: worktreePath,
         description: `${plan.issueId} の実装内容が正しく動作するか、以下の計画をもとに検証する:\n${plan.planContent}`,
+        scenarioTitles: null,
         serverCommand: null,
         port: null,
       }),

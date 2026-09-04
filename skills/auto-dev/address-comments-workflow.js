@@ -11,13 +11,27 @@ const E2E_SCHEMA = {
   properties: {
     clean: { type: 'boolean' },
     findings: { type: ['string', 'null'] },
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          passed: { type: 'boolean' },
+          detail: { type: 'string' },
+          screenshot: { type: ['string', 'null'] },
+        },
+        required: ['title', 'passed', 'detail', 'screenshot'],
+      },
+      description: 'シナリオごとの検証結果（scenarioTitles が null の場合は空配列）',
+    },
     screenshots: {
       type: 'array',
       items: { type: 'string' },
       description: '動作確認時に取得したスクリーンショットのファイルパス一覧（なければ空配列）',
     },
   },
-  required: ['clean', 'findings', 'screenshots'],
+  required: ['clean', 'findings', 'results', 'screenshots'],
 }
 
 const VERIFY_SCHEMA = {
@@ -51,6 +65,7 @@ const e2e = await agent(
   JSON.stringify({
     workingDir: worktreePath,
     description: `以下の対応内容が正しく動作するか検証する:\n${summary}`,
+    scenarioTitles: null,
     serverCommand: null,
     port: null,
   }),
