@@ -5,6 +5,12 @@ import { dedent } from './utils.js'
 export const REPO = TARGET_REPO.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '')
 export const [OWNER, NAME] = REPO.split('/')
 
+export function gitIsWorktree(dir: string): boolean {
+  const result = runCommand([`git -C "${dir}" rev-parse --git-dir --git-common-dir`])
+  const [gitDir, commonDir] = (result || '').trim().split('\n')
+  return Boolean(gitDir && commonDir && gitDir !== commonDir)
+}
+
 export function gitBuildScreenshotsSection(
   screenshots: readonly string[] | null | undefined,
   toUrl: (path: string) => string | null,
