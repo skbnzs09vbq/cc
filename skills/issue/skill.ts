@@ -67,6 +67,7 @@ export function issue(issueInput: string): string {
     const e2eResult = testE2e({
       workingDir: '.',
       description: `${plan.issueId} の実装内容（${plan.planContent}）が正しく動作するか、変更箇所を中心に検証する`,
+      scenarioTitles: null,
       serverCommand: null,
       port: null,
     })

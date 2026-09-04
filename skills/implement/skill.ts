@@ -1,4 +1,4 @@
-import { TASK_TRACKER, TEST_POLICY_URL } from '../../local/project.js'
+import { TASK_TRACKER } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -11,6 +11,7 @@ import {
 } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
+import { testScenario } from '../test-scenario/skill.js'
 
 const SUMMARY_SCHEMA = {
   type: 'object',
@@ -94,21 +95,17 @@ export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
       content = input
   }
 
-  // ─── Phase 3: テスト方針の確認 ─────────────────────────────
-  phase('テスト方針の確認')
+  // ─── Phase 3: テストシナリオの洗い出し ─────────────────────
+  phase('テストシナリオの洗い出し')
 
-  const includesTests = complete(
-    dedent`
-      以下の実装内容にテストの実装が含まれるか判定してください
+  const { testPolicy, scenarios } = testScenario({ workingDir, content: content ?? input })
 
-      実装内容:
-      ${content}
-    `,
-    { type: 'boolean' } as const,
-  )
-
-  let testPolicy = null
-  if (includesTests && TEST_POLICY_URL) testPolicy = runTool(`WebFetch("${TEST_POLICY_URL}")`)
+  const scenarioText = scenarios
+    .map(
+      (s) =>
+        `- [${s.layer}/${s.category}] ${s.title}\n  前提: ${s.precondition}\n  手順: ${s.steps.join(' → ')}\n  期待: ${s.expected}`,
+    )
+    .join('\n')
 
   // ─── Phase 4: 実装 ─────────────────────────────────────────
   phase('実装')
@@ -122,6 +119,9 @@ export function implement(args: Infer<typeof ARGS_SCHEMA>): string {
     ${content}
 
     ${testPolicy ? `testPolicy:\n${testPolicy}` : ''}
+
+    テストシナリオ（実行せずに実装がこれらを満たすようにしてください）:
+    ${scenarioText}
   `)
 
   const result = complete('実装で対応した内容をすべて箇条書きで列挙してください', SUMMARY_SCHEMA)

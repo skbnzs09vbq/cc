@@ -8,7 +8,13 @@ import {
   writeFile,
 } from '../_shared/complete.js'
 import type { Infer } from '../_shared/infer.js'
+import {
+  E2E_SCREENSHOT_DIR,
+  E2E_SCRIPT_PATH,
+  WITH_SERVER_SCRIPT,
+} from '../_shared/paths.js'
 import { dedent } from '../_shared/utils.js'
+import { checkDevServer } from '../server/check-dev-server/skill.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -17,6 +23,12 @@ export const ARGS_SCHEMA = {
     description: {
       type: 'string',
       description: '何を検証するか（実装計画・対応内容の要約など）',
+    },
+    scenarioTitles: {
+      type: ['array', 'null'],
+      items: { type: 'string' },
+      description:
+        'array: description に含まれるシナリオの title 一覧（結果をシナリオ単位で返したい場合）, null: 一括判定でよい場合',
     },
     serverCommand: {
       type: ['string', 'null'],
@@ -28,7 +40,7 @@ export const ARGS_SCHEMA = {
       description: 'integer: サーバーのポート番号, null: serverCommand が null の場合（自動判定する）',
     },
   },
-  required: ['workingDir', 'description', 'serverCommand', 'port'],
+  required: ['workingDir', 'description', 'scenarioTitles', 'serverCommand', 'port'],
 } as const satisfies Schema
 
 const RESULT_SCHEMA = {
@@ -39,13 +51,30 @@ const RESULT_SCHEMA = {
       type: ['string', 'null'],
       description: 'string: clean が false の場合の問題内容の要約, null: clean が true の場合',
     },
+    results: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '対応するシナリオの title' },
+          passed: { type: 'boolean', description: 'expected 通りだったか' },
+          detail: { type: 'string', description: '実際に観測された状態。失敗時は期待との差分' },
+          screenshot: {
+            type: ['string', 'null'],
+            description: 'そのシナリオの証跡になるスクリーンショットのパス。無ければ null',
+          },
+        },
+        required: ['title', 'passed', 'detail', 'screenshot'],
+      },
+      description: 'シナリオごとの検証結果（scenarioTitles が空の場合は空配列）',
+    },
     screenshots: {
       type: 'array',
       items: { type: 'string' },
       description: '検証中に撮影したスクリーンショットのローカルファイルパス一覧（無ければ空配列）',
     },
   },
-  required: ['clean', 'findings', 'screenshots'],
+  required: ['clean', 'findings', 'results', 'screenshots'],
 } as const satisfies Schema
 
 const JUDGE_SCHEMA = {
@@ -53,8 +82,9 @@ const JUDGE_SCHEMA = {
   properties: {
     clean: RESULT_SCHEMA.properties.clean,
     findings: RESULT_SCHEMA.properties.findings,
+    results: RESULT_SCHEMA.properties.results,
   },
-  required: ['clean', 'findings'],
+  required: ['clean', 'findings', 'results'],
 } as const satisfies Schema
 
 const SERVER_SCHEMA = {
@@ -75,20 +105,25 @@ const SERVER_SCHEMA = {
 
 export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SCHEMA> {
   const { workingDir, description } = args
-  const scriptPath = `${workingDir}/.e2e_check.py`
-  const screenshotDir = `${workingDir}/.e2e_screenshots`
+  const scriptPath = `${workingDir}/${E2E_SCRIPT_PATH}`
+  const runId = runCommand(['date -u +%Y%m%d-%H%M%S'])?.trim() || 'latest'
+  const screenshotDir = `${workingDir}/${E2E_SCREENSHOT_DIR}/${runId}`
 
   // ─── Phase 1: サーバー要否の判断 ─────────────────────────────
   phase('サーバー要否の判断')
 
+  const server = checkDevServer({ workingDir })
+
   let { serverCommand, port } = args
-  if (!serverCommand) {
+  if (server.ready) {
+    serverCommand = null
+  } else if (!serverCommand) {
     const packageJson = runCommand([`cat ${workingDir}/package.json 2>/dev/null || echo ""`])
     const detected = complete(
       dedent`
         以下のディレクトリで E2E 検証を行うにあたり、開発サーバーの起動が必要か判定してください
         必要なら、起動コマンドとポート番号を package.json の scripts 等から特定してください
-        既にサーバーが起動済みの可能性がある場合や静的 HTML のみの場合は needed:false としてください
+        静的 HTML のみで file:// で開ける場合は needed:false としてください
 
         package.json（無ければ空）:
         ${packageJson || '(なし)'}
@@ -99,6 +134,8 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
       SERVER_SCHEMA,
     )
     if (detected.needed) {
+      if (!server.canStart)
+        return { clean: false, findings: server.reason, results: [], screenshots: [] }
       serverCommand = detected.command
       port = detected.port
     }
@@ -126,15 +163,15 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     - スクリプト全文のみを返してください（説明文やMarkdownのコードブロック記法は不要）
   `)
 
-  writeFile(scriptPath, script)
   runCommand([`mkdir -p ${screenshotDir}`])
+  writeFile(scriptPath, script)
 
   // ─── Phase 3: 実行 ───────────────────────────────────────────
   phase('実行')
 
   const output = serverCommand
     ? runCommand([
-        `cd ${workingDir} && python .claude/skills/test-e2e/scripts/with_server.py --server "${serverCommand}" --port ${port} -- python ${scriptPath}`,
+        `cd ${workingDir} && python ${WITH_SERVER_SCRIPT} --server "${serverCommand}" --port ${port} -- python ${scriptPath}`,
       ])
     : runCommand([`cd ${workingDir} && python ${scriptPath}`])
 
@@ -147,10 +184,25 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
   // ─── Phase 4: 判定 ───────────────────────────────────────────
   phase('判定')
 
+  const { scenarioTitles } = args
   const judged = complete(
     dedent`
       以下は E2E 検証スクリプトの実行結果です
       検証内容と照らして問題が無いか判定してください
+
+      ${
+        scenarioTitles
+          ? dedent`
+              results には以下の title ごとに1件ずつ、合否・観測された状態・証跡になるスクリーンショットのパスを入れてください
+
+              title 一覧:
+              ${scenarioTitles.map((t) => `- ${t}`).join('\n')}
+
+              撮影されたスクリーンショット:
+              ${screenshots.map((p) => `- ${p}`).join('\n') || '(なし)'}
+            `
+          : 'results は空配列でよいです'
+      }
 
       検証内容:
       ${description}
@@ -163,7 +215,7 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
 
   runCommand([`rm -f ${scriptPath}`])
 
-  return { clean: judged.clean, findings: judged.findings, screenshots }
+  return { clean: judged.clean, findings: judged.findings, results: judged.results, screenshots }
 }
 
 respond(testE2e(getArgs(ARGS_SCHEMA)))
