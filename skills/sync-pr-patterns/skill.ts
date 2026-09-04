@@ -1,4 +1,4 @@
-import { PR_PATTERNS } from '../../local/project.js'
+import { PR_PATTERNS, PROJECT_ROOT } from '../../local/project.js'
 import { getArgs } from '../_shared/args.js'
 import {
   type Schema,
@@ -9,7 +9,7 @@ import {
   runCommand,
   writeFile,
 } from '../_shared/complete.js'
-import { REPO } from '../_shared/git.js'
+import { REPO, gitIsWorktree } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
 import { dedent } from '../_shared/utils.js'
 
@@ -20,6 +20,12 @@ export const ARGS_SCHEMA = {
   },
   required: ['workingDir'],
 } as const satisfies Schema
+
+const LEVEL_CRITERIA = dedent`
+  - must: 守らないとバグ・事故・レビュー差し戻しになるもの（指摘が繰り返されている、重要度 HIGH/CRITICAL のもの）
+  - should: 直した方が明確に良いが、状況によっては外してよいもの
+  - nit: 書き方の好みにとどまるもの（レビューで "nit" と添えられていたもの含む）
+`
 
 const CLASSIFIED_SCHEMA = {
   type: 'object',
@@ -86,22 +92,49 @@ export function syncPrPatterns(args: Infer<typeof ARGS_SCHEMA>): string {
   // ─── Phase 4: パターン集の更新 ───────────────────────────────
   phase('パターン集更新')
 
-  const currentPatterns = runCommand([
-    `cd ${workingDir} && cat ${PR_PATTERNS} 2>/dev/null || echo ""`,
-  ])
+  const patternsPath = gitIsWorktree(workingDir)
+    ? `${PROJECT_ROOT}/${PR_PATTERNS}`
+    : `${workingDir}/${PR_PATTERNS}`
+  const currentPatterns = runCommand([`cat ${patternsPath} 2>/dev/null || echo ""`])
 
   const updatedPatterns = generate(
     dedent`
       既存のパターン集と、分類済みの PR コメント・レビューを照合し、パターン集を更新してください
       構造（AI / ヒューマン の2大セクション → カテゴリ番号・見出し形式）は維持してください
 
-      - 既存カテゴリに追加すべき新しい具体例があれば、既存カテゴリに追記する
-      - 新規カテゴリとして追加すべき指摘があれば、新カテゴリを追加する
+      ## マージ方針
+
+      新規追加より既存への統合を優先する。項目の総数はできるだけ増やさない
+
+      - 新しい指摘は、まず既存カテゴリの項目に取り込めないかを検討する。趣旨が重なるもの・既存項目の
+        具体例に過ぎないものは、独立した項目にせず既存側に統合するか捨てる
+      - 既存項目を少し広げれば新しい指摘も包含できる場合は、既存の文言を汎用化して1本にまとめる
+      - 新規カテゴリ・新規項目として独立させるのは、既存のどれにも含められない観点が現れた場合だけにする
         ただし1件しか確認されていない指摘は昇格させず、2件以上確認された、または重要度 HIGH/CRITICAL の場合のみ追加する
-      - 過去のパターンで現在は修正済み・廃止された観点があれば、削除またはコメントアウトする
+      - 過去のパターンで現在は修正済み・廃止された観点があれば削除する
+
+      ## 文言の方針
+
+      項目は「どんな場面にも当てはまる原則」として書く。特定の PR の記録にしない
+
+      - シチュエーションを詳しく書かない。指摘が出た PR 番号・ファイル名・関数名・やり取りの経緯は
+        書かず、そこから抽出した原則だけを書く
+      - 既存の文言も対象にする。冗長な説明・重複する言い回し・具体例の列挙が含まれていれば、
+        意味を変えない範囲で短く書き直す
+      - 似た項目どうしで語彙・言い回しが揃っていなければ統一する（同じ概念を別の言葉で書かない）
+      - 1項目は1〜2文。それ以上必要なら、原則の抽出が足りていないか、2つの項目が混ざっている
+
+      ## レベル付与
+
+      各項目の見出し末尾に [must] / [should] / [nit] を付ける（例: "### 3-2 any の使用を避ける [must]"）
+      ${LEVEL_CRITERIA}
+      既存項目にレベルが無い場合も、内容から同じ基準で振り分ける
+
+      ## その他
+
       - ファイル冒頭の「最終更新」日付を今日の日付と対象 PR 範囲（例: #12-#48）に更新する
 
-      既存パターン集（${PR_PATTERNS}、存在しない場合は新規作成）:
+      既存パターン集（${patternsPath}、存在しない場合は新規作成）:
       ${currentPatterns || '(なし・新規作成)'}
 
       AI レビューのコメント:
@@ -110,11 +143,11 @@ export function syncPrPatterns(args: Infer<typeof ARGS_SCHEMA>): string {
       ヒューマンレビューのコメント:
       ${JSON.stringify(classified.humanReview)}
 
-      更新後の ${PR_PATTERNS} の全文を返してください
+      更新後の全文を返してください
     `,
   )
 
-  writeFile(`${workingDir}/${PR_PATTERNS}`, updatedPatterns)
+  writeFile(patternsPath, updatedPatterns)
 
   // ─── Phase 5: 報告 ───────────────────────────────────────────
   phase('報告')

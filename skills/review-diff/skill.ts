@@ -4,6 +4,7 @@ import {
   LINT_COMMAND,
   LINT_FIX_COMMAND,
   MONOREPO_APPS_DIR,
+  PROJECT_ROOT,
   PR_PATTERNS,
   TAILWIND_CHECK,
   TYPECHECK_COMMAND,
@@ -18,8 +19,9 @@ import {
   respond,
   runCommand,
 } from '../_shared/complete.js'
+import { gitIsWorktree } from '../_shared/git.js'
 import type { Infer } from '../_shared/infer.js'
-import { dedent } from '../_shared/utils.js'
+import { boxTable, dedent } from '../_shared/utils.js'
 
 export const ARGS_SCHEMA = {
   type: 'object',
@@ -29,25 +31,66 @@ export const ARGS_SCHEMA = {
   required: ['workingDir'],
 } as const satisfies Schema
 
+const SOURCES = ['lint', '型チェック', 'Tailwind', 'パターン集', '実装指針', 'code-review'] as const
+const SEVERITIES = ['must', 'should', 'nit'] as const
+const SEVERITY_ICONS: Record<string, string> = { must: '❌', should: '⚠', nit: '💭' }
+
+const ITEMS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      source: {
+        type: 'string',
+        enum: SOURCES,
+        description: 'この指摘がどのチェック由来か',
+      },
+      severity: {
+        type: 'string',
+        enum: SEVERITIES,
+        description: dedent`
+          must: バグ・型エラー・パターン集や指針の must 違反
+          should: 直した方が明確に良いもの・指針の should 違反
+          nit: 書き方の好みにとどまるもの・指針の nit 違反
+          実装指針由来の指摘は指針が置かれているレベル見出しを、
+          パターン集由来の指摘は項目見出し末尾の [must]/[should]/[nit] を、それぞれそのまま使う
+        `,
+      },
+      title: {
+        type: 'string',
+        description:
+          '指摘の見出し。パターン違反なら "[3-2] any の使用禁止" のようにカテゴリ番号-項目番号を先頭に付ける',
+      },
+      file: { type: 'string', description: '対象ファイルのパス' },
+      line: { type: ['integer', 'null'], description: '対象行。特定できなければ null' },
+      problem: { type: 'string', description: '何が問題かを1行で' },
+      fix: { type: 'string', description: '具体的にどう直すか' },
+    },
+    required: ['source', 'severity', 'title', 'file', 'line', 'problem', 'fix'],
+  },
+  description: '指摘一覧（1件も無ければ空配列）',
+} as const satisfies Schema
+
 const CHECK_RESULT_SCHEMA = {
   type: 'object',
   properties: {
     clean: { type: 'boolean', description: '問題が一切ないかどうか' },
     findings: {
       type: ['string', 'null'],
-      description:
-        'string: clean が false の場合の、出力フォーマットに従って整形した指摘内容, null: clean が true の場合',
+      description: 'string: clean が false の場合の整形済みレビュー結果, null: clean が true の場合',
     },
+    items: ITEMS_SCHEMA,
   },
-  required: ['clean', 'findings'],
+  required: ['clean', 'findings', 'items'],
 } as const satisfies Schema
 
 export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA> {
   // ─── Phase 1: 前提ファイルの確認 ─────────────────────────────
   phase('前提ファイル確認')
 
-  const prPatterns = runCommand([`cd ${workingDir} && cat ${PR_PATTERNS} 2>/dev/null || echo ""`])
-  const guidelines = runCommand([`cd ${workingDir} && cat ${GUIDELINES} 2>/dev/null || echo ""`])
+  const sharedDir = gitIsWorktree(workingDir) ? PROJECT_ROOT : workingDir
+  const prPatterns = runCommand([`cat ${sharedDir}/${PR_PATTERNS} 2>/dev/null || echo ""`])
+  const guidelines = runCommand([`cat ${sharedDir}/${GUIDELINES} 2>/dev/null || echo ""`])
 
   // ─── Phase 2: 差分取得 ───────────────────────────────────────
   phase('差分取得')
@@ -163,20 +206,13 @@ export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA
     `,
   })
 
-  // ─── Phase 8: 出力フォーマットへの整形 ───────────────────────
-  phase('出力フォーマットへの整形')
+  // ─── Phase 8: 指摘の構造化 ───────────────────────────────────
+  phase('指摘の構造化')
 
-  const OUTPUT_TEMPLATE = dedent`
-    #### [カテゴリ番号-項目番号] 項目名（パターン違反の場合）／{指針タイトル}（指針違反の場合）／{指摘タイトル}（code-review 指摘の場合）
-    - ファイル: \`{path}:{line}\`
-    - 問題: {何が問題か1行で}
-    - 修正案: {具体的にどう直すか}
-  `
-
-  return complete(
+  const items = complete(
     dedent`
-      以下の各チェック結果を判定してください
-      findings は出力フォーマットのテンプレートに従って、パターン違反・指針違反・code-review 指摘を1件ずつ整形してください
+      以下の各チェック結果を、指摘1件につき1要素として構造化してください
+      同じ箇所を複数のチェックが指摘している場合は、より具体的な方1件にまとめてください
 
       lint エラー: ${lintResult || 'なし'}
 
@@ -189,12 +225,69 @@ export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA
       指針違反候補: ${guidelineViolations || '(指針なし)'}
 
       code-review 指摘: ${codeReviewResult}
-
-      出力フォーマット（findings 用テンプレート）:
-      ${OUTPUT_TEMPLATE}
     `,
-    CHECK_RESULT_SCHEMA,
+    ITEMS_SCHEMA,
   )
+
+  // ─── Phase 9: 出力フォーマットへの整形 ───────────────────────
+  phase('出力フォーマットへの整形')
+
+  if (items.length === 0) return { clean: true, findings: null, items }
+
+  const countOf = (source: string, severity: string) =>
+    items.filter((i) => i.source === source && i.severity === severity).length
+  const totalOf = (severity: string) => items.filter((i) => i.severity === severity).length
+
+  const usedSources = SOURCES.filter((source) => items.some((i) => i.source === source))
+
+  const summaryTable = boxTable(
+    ['出所', ...SEVERITIES, '計'],
+    [
+      ...usedSources.map((source) => [
+        source,
+        ...SEVERITIES.map((severity) => `${countOf(source, severity)}`),
+        `${items.filter((i) => i.source === source).length}`,
+      ]),
+      ['合計', ...SEVERITIES.map((severity) => `${totalOf(severity)}`), `${items.length}`],
+    ],
+    [usedSources.length],
+  )
+
+  const section = (severity: string) => {
+    const target = items.filter((i) => i.severity === severity)
+    if (target.length === 0) return ''
+
+    return dedent`
+      ### ${severity}
+
+      ${target
+        .map((i) =>
+          dedent`
+            ${SEVERITY_ICONS[severity]} [${i.source}] ${i.title}
+              ${i.file}${i.line ? `:${i.line}` : ''}
+              問題: ${i.problem}
+              修正案: ${i.fix}
+          `,
+        )
+        .join('\n\n')}
+    `
+  }
+
+  const blocking = totalOf('must') + totalOf('should')
+
+  return {
+    clean: blocking === 0,
+    findings: dedent`
+      ## レビュー結果 ${blocking === 0 ? `✅ must/should なし（nit ${totalOf('nit')}件）` : `❌ ${items.length}件の指摘`}
+
+      ${summaryTable}
+
+      ${SEVERITIES.map((severity) => section(severity))
+        .filter(Boolean)
+        .join('\n\n')}
+    `,
+    items,
+  }
 }
 
 respond(reviewDiff(getArgs(ARGS_SCHEMA).workingDir))

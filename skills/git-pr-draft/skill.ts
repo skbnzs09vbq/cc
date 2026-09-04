@@ -9,6 +9,7 @@ import {
 import { parseArgs } from '../_shared/args.js'
 import { type Schema, complete, remember, respond, runCommand } from '../_shared/complete.js'
 import { dedent } from '../_shared/utils.js'
+import { draftSpec } from '../draft-spec/skill.js'
 
 const PR_SCHEMA = {
   type: 'object',
@@ -37,6 +38,8 @@ export function gitPrDraft(supplement: string): { title: string; description: st
 
   const log = runCommand([`git log ${BASE_BRANCH}..HEAD --oneline`])
   const diffStat = runCommand([`git diff ${BASE_BRANCH}...HEAD --stat`])
+
+  const spec = draftSpec({ workingDir: null, supplement: supplement || null })
 
   // ─── Phase 2: type 判定 ─────────────────────────────────────
   phase('type 判定')
@@ -73,6 +76,10 @@ export function gitPrDraft(supplement: string): { title: string; description: st
       ## description
       テンプレート:
       ${template || '(テンプレートが取得できなかった場合は一般的な PR description 構成で生成する)'}
+
+      対応内容を書くセクションには、以下の仕様ベースの箇条書きをそのまま使う
+      （テンプレートの見出し構成に合わせて配置し、内容の要約・省略はしない）:
+      ${spec.markdown}
 
       ## 参考情報
       コミットログ:
