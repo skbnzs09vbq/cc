@@ -20,7 +20,7 @@ CLAUDE.md 内に、具体的なファイル名・ツール名・値などプロ�
 - ユーザーの許可なく PR に加筆・編集・コメントを行わないこと
 - 担当者（`ASSIGNEE`）以外のアカウントが担当する PR に対して、read 以外の操作（編集・コメント・マージ等）を行わないこと。`ASSIGNEE` の値は `.claude/local/project.ts` を参照する
 - PR のマージは絶対に行わないこと（担当者・権限問わず）
-- **例外（auto-dev workflow）**: `.claude/skills/auto-dev/*-workflow.js` から起動された agent 呼び出しは自律実行が前提のため、上記の許可確認を待たず以下を行ってよい
+- **例外（auto-dev workflow）**: `.claude/src/auto-dev/*-workflow.js` から起動された agent 呼び出しは自律実行が前提のため、上記の許可確認を待たず以下を行ってよい
     - `git commit` / `git push`
     - PR の作成
     - PR への加筆・編集・コメント
@@ -41,4 +41,4 @@ CLAUDE.md 内に、具体的なファイル名・ツール名・値などプロ�
 - 閲覧（read）のみ許可。デザインの取得・参照・スクショ・メタデータ取得などは可
 - 作成・編集・書き込み・アップロード・同期は絶対に行わないこと（`use_figma` / `create_new_file` / `generate_diagram` / `generate_figma_design` / `upload_assets` / `add_code_connect_map` / `send_code_connect_mappings` 等の write 系 MCP ツールは使用禁止）
 
-`.claude/skills/` 配下のスキル（skill.ts・SKILL.md 等）を作成・編集する際の規約は `.claude/skills/CLAUDE.md` を参照。
+スキルは `.claude/skills/{name}/SKILL.md`（呼び出し口）と `.claude/src/{name}/skill.ts`（実装）に分かれる。作成・編集する際の規約は `.claude/src/CLAUDE.md` を参照。

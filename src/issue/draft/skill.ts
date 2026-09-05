@@ -1,0 +1,156 @@
+import { BASE_BRANCH, ISSUE_TEMPLATE } from '../../../local/project.js'
+import { research } from '../../research/skill.js'
+import { getArgs } from '../../shared/args.js'
+import {
+  type Schema,
+  askUser,
+  buildCommandPrompt,
+  complete,
+  exit,
+  generate,
+  respond,
+  runCommand,
+} from '../../shared/complete.js'
+import type { Infer } from '../../shared/infer.js'
+import { dedent } from '../../shared/utils.js'
+
+const ALREADY_IMPLEMENTED_SCHEMA = {
+  type: 'object',
+  properties: {
+    implemented: {
+      type: 'boolean',
+      description:
+        'この issue で書こうとしている内容が、origin/{BASE_BRANCH} の最新コードにすでに実装済み（または一部実装済み）かどうか',
+    },
+    summary: {
+      type: ['string', 'null'],
+      description: 'string: implemented が true の場合の概要, null: implemented が false の場合',
+    },
+  },
+  required: ['implemented', 'summary'],
+} as const satisfies Schema
+
+export const ARGS_SCHEMA = {
+  type: 'object',
+  properties: {
+    input: { type: 'string', description: '自由記述の issue 起票内容（要望・背景等）' },
+    shouldContinue: {
+      type: ['boolean', 'null'],
+      description: 'boolean: 実装済みの可能性がある場合でも続けるか, null: 未定（ユーザーに確認する）',
+    },
+  },
+  required: ['input', 'shouldContinue'],
+} as const satisfies Schema
+
+export function draftIssue(args: Infer<typeof ARGS_SCHEMA>): string {
+  const { input } = args
+  let { shouldContinue } = args
+
+  // ─── Phase 1: 項目抽出 ─────────────────────────────────────
+  phase('項目抽出')
+
+  const fieldNames = [...ISSUE_TEMPLATE.matchAll(/^#{1,2}\s+(.+)$/gm)].map((m) =>
+    m[1].replace(/[{}]/g, '').trim(),
+  )
+
+  const FIELDS_SCHEMA: Schema = {
+    type: 'object',
+    properties: Object.fromEntries(fieldNames.map((name) => [name, { type: ['string', 'null'] }])),
+    required: fieldNames,
+  }
+
+  let fields = complete(
+    dedent`
+      以下の入力から、ISSUE_TEMPLATE の各項目に当てはまる情報を抽出してください
+      根拠なく推測で埋めず、判断できない項目は null にしてください
+
+      入力:
+      ${input}
+
+      ISSUE_TEMPLATE:
+      ${ISSUE_TEMPLATE}
+    `,
+    FIELDS_SCHEMA,
+  )
+
+  // ─── Phase 2: 背景調査 ─────────────────────────────────────
+  phase('背景調査')
+
+  const researchTopic = generate(dedent`
+    次の入力から、背景調査に使う調査テーマを抽出してください
+
+    ${input}
+  `)
+
+  const researchResult = research(researchTopic)
+
+  // ─── Phase 3: 実装状況の確認 ───────────────────────────────
+  phase('実装状況の確認')
+
+  runCommand(['git fetch origin'])
+
+  const alreadyImplemented = complete(
+    buildCommandPrompt(
+      `origin/${BASE_BRANCH} の最新コードを確認し、この issue で書こうとしている内容がすでに実装済みでないか確認してください`,
+      [`git log --oneline origin/${BASE_BRANCH} -20`, `git diff origin/${BASE_BRANCH}`],
+    ),
+    ALREADY_IMPLEMENTED_SCHEMA,
+  )
+
+  if (alreadyImplemented.implemented) {
+    shouldContinue ??= askUser(
+      dedent`
+        origin/${BASE_BRANCH} を確認したところ、以下の内容はすでに実装済みの可能性があります
+        ${alreadyImplemented.summary}
+        このまま issue 下書きの作成を続けますか？
+      `,
+      { type: 'boolean' } as const,
+    )
+    if (!shouldContinue) exit('既に実装済みの可能性があるため、issue 下書きの作成を中止しました')
+  }
+
+  // ─── Phase 4: 不足項目の質問 ────────────────────────────────
+  phase('不足項目の質問')
+
+  const missingFields = Object.entries(fields)
+    .filter(([, value]) => value === null)
+    .map(([key]) => key)
+
+  if (missingFields.length > 0) {
+    const ANSWERS_SCHEMA: Schema = {
+      type: 'object',
+      properties: Object.fromEntries(missingFields.map((f) => [f, { type: 'string' }])),
+      required: missingFields,
+    }
+
+    const answers = askUser(
+      dedent`
+        以下の項目は入力・調査だけでは判断できませんでした
+        教えてください
+        ${missingFields.map((f) => `- ${f}`).join('\n')}
+      `,
+      ANSWERS_SCHEMA,
+    ) as Record<string, string>
+    fields = { ...fields, ...answers }
+  }
+
+  // ─── Phase 5: 出力 ──────────────────────────────────────────
+  phase('出力')
+
+  return generate(
+    dedent`
+      fields の内容を ISSUE_TEMPLATE に当てはめ、issue 下書き（タイトル＋本文）の Markdown を出力してください
+
+      ISSUE_TEMPLATE:
+      ${ISSUE_TEMPLATE}
+
+      fields:
+      ${JSON.stringify(fields)}
+
+      researchResult:
+      ${researchResult}
+    `,
+  )
+}
+
+respond(draftIssue(getArgs(ARGS_SCHEMA)))

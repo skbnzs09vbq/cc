@@ -6,4 +6,4 @@ user-invocable: true
 model: opus
 ---
 
-`skill.ts` を読み、その内容に従って実行する
+`../../src/sync/pr-patterns/skill.ts` を読み、その内容に従って実行する

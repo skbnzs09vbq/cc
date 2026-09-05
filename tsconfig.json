@@ -7,8 +7,8 @@
     "noEmit": true,
     "skipLibCheck": true,
     "paths": {
-      "@skills/*": ["./skills/*"]
+      "@src/*": ["./src/*"]
     }
   },
-  "include": ["skills/**/*.ts", "agents/**/*.ts", "local/project.ts"]
+  "include": ["src/**/*.ts", "agents/**/*.ts", "local/project.ts"]
 }

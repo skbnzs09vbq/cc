@@ -6,4 +6,4 @@ user-invocable: true
 model: fable
 ---
 
-`skill.ts` を読み、その内容に従って実行する
+`../../src/grill-me/skill.ts` を読み、その内容に従って実行する

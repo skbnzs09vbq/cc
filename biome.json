@@ -24,15 +24,15 @@
     }
   },
   "files": {
-    "ignore": ["skills/auto-dev/*-workflow.js"]
+    "ignore": ["src/auto-dev/*-workflow.js"]
   },
   "overrides": [
     {
       "include": [
-        "skills/_shared/infer.ts",
-        "skills/_shared/complete.ts",
-        "skills/_shared/globals.ts",
-        "skills/_shared/utils.ts"
+        "src/shared/infer.ts",
+        "src/shared/complete.ts",
+        "src/shared/globals.ts",
+        "src/shared/utils.ts"
       ],
       "linter": {
         "rules": {

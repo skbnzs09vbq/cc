@@ -6,4 +6,4 @@ user-invocable: true
 model: sonnet
 ---
 
-`skill.ts` を読み、その内容に従って実行する
+`../../src/issue/draft/skill.ts` を読み、その内容に従って実行する

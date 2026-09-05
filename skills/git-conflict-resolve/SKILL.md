@@ -6,4 +6,4 @@ user-invocable: true
 model: haiku
 ---
 
-`skill.ts` を読み、その内容に従って実行する。
+`../../src/git/conflict-resolve/skill.ts` を読み、その内容に従って実行する。
