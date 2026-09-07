@@ -7,12 +7,12 @@ import {
   WORKTREE_SETUP_COMMANDS,
 } from '../../../../local/project.js'
 import { getArgs } from '../../../shared/args.js'
-import { type Schema, respond, runCommand } from '../../../shared/complete.js'
+import { type Schema, respond, runCommand, writeFile } from '../../../shared/complete.js'
 import type { Infer } from '../../../shared/infer.js'
+import { PROGRESS_PATH, WORKTREE_DIR } from '../../../shared/paths.js'
 import { addWorkspaceFolder } from '../../../shared/vscode-workspace.js'
+import { renderProgress } from '../../../progress/skill.js'
 import { openHerdrWorkspace } from '../../../herdr/open-herdr-workspace/skill.js'
-
-const WORKTREE_DIR = '.claude/local/worktrees'
 
 const ARGS_SCHEMA = {
   type: 'object',
@@ -74,6 +74,22 @@ export function gitWorktreeCreate(
         WORKTREE_SETUP_COMMANDS.map((command: string) => `cd ${worktreePath} && ${command}`),
       )
     }
+
+    writeFile(
+      `${worktreePath}/${PROGRESS_PATH}`,
+      renderProgress({
+        status: 'idle',
+        issue: `${issueNumber}`,
+        task: null,
+        branch: branch ?? BASE_BRANCH,
+        updated: runCommand(['date -u +%FT%TZ'])?.trim() ?? null,
+        pending: 0,
+        questions: [],
+        now: '',
+        done: [],
+        next: [],
+      }),
+    )
 
     addWorkspaceFolder(worktreePath, `${TICKET_PREFIX || 'issue'}-${issueNumber}-worktree`)
 
