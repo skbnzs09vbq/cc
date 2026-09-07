@@ -200,8 +200,18 @@ function activeTestIssue(entries: { number: number; progress: Progress }[]): num
   return verifying?.number ?? null
 }
 
+const SERVER_COMMANDS = ['/test-run', '/test-e2e', '/test-api', '/test-visual-diff']
+
 function needsServerFor(commands: string[]): boolean {
-  return commands.some((c) => c.startsWith('/test-run') || c.startsWith('/test-e2e'))
+  return commands.some((c) => SERVER_COMMANDS.some((command) => c.includes(command)))
+}
+
+function acquireTestLock(issue: number) {
+  devServer({ target: `${TICKET_PREFIX || 'issue'}-${issue}` })
+  writeFile(
+    `${PROJECT_ROOT}/${TEST_LOCK_PATH}`,
+    JSON.stringify({ issue, startedAt: runCommand(['date -u +%FT%TZ'])?.trim() ?? '' }, null, 2),
+  )
 }
 
 const REVIEW_POLICY = [
@@ -403,11 +413,18 @@ export function dispatchWork(): string {
     .slice(0, QUEUE_BATCH)
 
   if (consumable.length > 0) {
+    let serverTaken = false
+
     const sent = consumable.filter((q) => {
       const agent = herdrFindAgent(q.issue)
       if (!agent) return false
-      if (needsServerFor([q.message]))
-        devServer({ target: `${TICKET_PREFIX || 'issue'}-${q.issue}` })
+
+      if (needsServerFor([q.message])) {
+        if (serverTaken) return false
+        acquireTestLock(q.issue)
+        serverTaken = true
+      }
+
       return herdrSend(agent, [q.message], POLICY)
     })
 
@@ -512,17 +529,7 @@ export function dispatchWork(): string {
   if (!chosen || !target)
     return '送る対象はありましたが、agent セッションを用意できませんでした（herdr の起動を確認してください）'
 
-  if (chosen.needsServer) {
-    devServer({ target: `${TICKET_PREFIX || 'issue'}-${chosen.number}` })
-    writeFile(
-      `${PROJECT_ROOT}/${TEST_LOCK_PATH}`,
-      JSON.stringify(
-        { issue: chosen.number, startedAt: runCommand(['date -u +%FT%TZ'])?.trim() ?? '' },
-        null,
-        2,
-      ),
-    )
-  }
+  if (chosen.needsServer) acquireTestLock(chosen.number)
 
   herdrSend(target, chosen.commands, chosen.notes)
 
