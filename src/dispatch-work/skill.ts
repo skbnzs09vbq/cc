@@ -111,19 +111,17 @@ function prepareForTask(task: TaskItem): () => string | null {
 const STALE_MINUTES = 30
 const TEST_LOCK_MINUTES = 45
 const QUEUE_BATCH = 3
-const MIN_ACTIVE_WORKTREES = 3
 
 const PRIORITY = {
   prComments: 1,
   conflict: 2,
-  starvedNewIssue: 3,
-  fixingStale: 4,
-  verifyingStale: 5,
-  workingStale: 6,
-  idleNext: 7,
-  reviewRequest: 8,
-  newIssue: 9,
-  blocked: 10,
+  reviewRequest: 3,
+  newIssue: 4,
+  fixingStale: 5,
+  verifyingStale: 6,
+  workingStale: 7,
+  idleNext: 8,
+  blocked: 9,
 }
 
 const NO_GIT_WRITE = [
@@ -458,56 +456,48 @@ export function dispatchWork(): string {
   // ─── Phase 5: 新規タスク・レビュー依頼の取り込み ─────────────
   phase('新規タスク・レビュー依頼の取り込み')
 
-  if (candidates.length === 0) {
-    for (const pr of reviewRequests) {
-      if (entries.some((e) => e.number === pr.issue)) continue
-      if (isTalking(pr.issue)) continue
+  for (const pr of reviewRequests) {
+    if (entries.some((e) => e.number === pr.issue)) continue
+    if (isTalking(pr.issue)) continue
 
-      candidates.push({
-        priority: PRIORITY.reviewRequest,
-        number: pr.issue,
-        needsServer: true,
-        label: `PR #${pr.number}（レビュー）`,
-        target: null,
-        prepare: prepareForPr(pr),
-        commands: [
-          `/draft-spec workingDir: ., supplement: ${pr.url}`,
-          '/review-diff workingDir: .',
-          '/test-run workingDir: ., content: このブランチで対応した内容',
-          '/walkthrough',
-        ],
-        notes: REVIEW_POLICY,
-      })
-      break
-    }
+    candidates.push({
+      priority: PRIORITY.reviewRequest,
+      number: pr.issue,
+      needsServer: true,
+      label: `PR #${pr.number}（レビュー）`,
+      target: null,
+      prepare: prepareForPr(pr),
+      commands: [
+        `/draft-spec workingDir: ., supplement: ${pr.url}`,
+        '/review-diff workingDir: .',
+        '/test-run workingDir: ., content: このブランチで対応した内容',
+        '/walkthrough',
+      ],
+      notes: REVIEW_POLICY,
+    })
+    break
   }
 
-  const activeCount = entries.filter((e) =>
-    ['idle', 'planning', 'implementing', 'verifying', 'fixing'].includes(e.progress.status),
-  ).length
+  for (const task of fetchMyPendingOrReadyTasks()) {
+    if (worktreeExists(task.number)) continue
 
-  if (candidates.length === 0 || activeCount < MIN_ACTIVE_WORKTREES) {
-    for (const task of fetchMyPendingOrReadyTasks()) {
-      if (worktreeExists(task.number)) continue
-
-      candidates.push({
-        priority: activeCount < MIN_ACTIVE_WORKTREES ? PRIORITY.starvedNewIssue : PRIORITY.newIssue,
-        number: task.number,
-        needsServer: false,
-        label: `${TICKET_PREFIX}-${task.number}（新規着手）`,
-        target: null,
-        prepare: prepareForTask(task),
-        commands: [`/implement ${task.url}`],
-        notes: [
-          ...(task.status === PREPARING_STATUS
-            ? [`ステータスが${PREPARING_STATUS}でも一旦仮で実装を進めること`]
-            : []),
-          'db への push・コミットは行わないこと',
-          ...POLICY,
-        ],
-      })
-      break
-    }
+    candidates.push({
+      priority: PRIORITY.newIssue,
+      number: task.number,
+      needsServer: false,
+      label: `${TICKET_PREFIX}-${task.number}（新規着手）`,
+      target: null,
+      prepare: prepareForTask(task),
+      commands: [`/implement ${task.url}`],
+      notes: [
+        ...(task.status === PREPARING_STATUS
+          ? [`ステータスが${PREPARING_STATUS}でも一旦仮で実装を進めること`]
+          : []),
+        'db への push・コミットは行わないこと',
+        ...POLICY,
+      ],
+    })
+    break
   }
 
   // ─── Phase 6: 優先度が最も高い1件だけ実行 ───────────────────
