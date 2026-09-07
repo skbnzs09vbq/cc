@@ -1,6 +1,6 @@
 ---
 name: dispatch-work
-description: 担当 PR の未解決指摘・レビュー依頼されている PR・担当タスク一覧（準備中/着手可能）を横断的にチェックし、対応する herdr worktree の agent セッションへ作業指示を送る（実装・レビュー自体はここでは行わない、送るだけ）。
+description: 各 worktree の progress.md を読み、優先度が最も高い1件にだけ次の作業指示を herdr agent セッションへ送る（実装・レビュー自体はここでは行わない）。初回実行時に10分おきの定期実行を自分で登録し、progress.md が無い worktree にはその作成を依頼する。テスト系の指示を送る時だけ dev サーバーを対象 worktree に切り替え、その間は他の worktree にテストを依頼しない。
 user-invocable: true
 model: haiku
 ---

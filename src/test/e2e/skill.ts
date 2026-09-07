@@ -8,11 +8,7 @@ import {
   writeFile,
 } from '../../shared/complete.js'
 import type { Infer } from '../../shared/infer.js'
-import {
-  E2E_SCREENSHOT_DIR,
-  E2E_SCRIPT_PATH,
-  WITH_SERVER_SCRIPT,
-} from '../../shared/paths.js'
+import { E2E_SCREENSHOT_DIR, WITH_SERVER_SCRIPT } from '../../shared/paths.js'
 import { dedent } from '../../shared/utils.js'
 import { checkDevServer } from '../../server/check/skill.js'
 
@@ -105,9 +101,9 @@ const SERVER_SCHEMA = {
 
 export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SCHEMA> {
   const { workingDir, description } = args
-  const scriptPath = `${workingDir}/${E2E_SCRIPT_PATH}`
   const runId = runCommand(['date -u +%Y%m%d-%H%M%S'])?.trim() || 'latest'
   const screenshotDir = `${workingDir}/${E2E_SCREENSHOT_DIR}/${runId}`
+  const scriptPath = `${screenshotDir}/e2e.py`
 
   // ─── Phase 1: サーバー要否の判断 ─────────────────────────────
   phase('サーバー要否の判断')
@@ -212,8 +208,6 @@ export function testE2e(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     `,
     JUDGE_SCHEMA,
   )
-
-  runCommand([`rm -f ${scriptPath}`])
 
   return { clean: judged.clean, findings: judged.findings, results: judged.results, screenshots }
 }

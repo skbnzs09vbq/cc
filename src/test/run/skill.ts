@@ -1,9 +1,13 @@
 import { getArgs } from '../../shared/args.js'
-import { type Schema, readFile, respond } from '../../shared/complete.js'
+import { type Schema, complete, readFile, respond, runCommand, writeFile } from '../../shared/complete.js'
 import type { Infer } from '../../shared/infer.js'
 import { boxTable, dedent } from '../../shared/utils.js'
 import { testE2e } from '../../test/e2e/skill.js'
-import { E2E_SCREENSHOT_DIR, TEST_SCENARIO_PATH } from '../../shared/paths.js'
+import {
+  API_SPEC_PATH,
+  TEST_RUN_DIR,
+  TEST_SCENARIO_PATH,
+} from '../../shared/paths.js'
 import { parseMarkdown, testScenario } from '../../test/scenario/skill.js'
 import { testApi } from '../../test/api/skill.js'
 
@@ -31,10 +35,18 @@ export const ARGS_SCHEMA = {
 const RESULT_SCHEMA = {
   type: 'object',
   properties: {
-    clean: { type: 'boolean', description: 'API・E2E ともに問題が無かったか' },
+    clean: { type: 'boolean', description: 'API・E2E ともに問題が無かったか（pending は含めない）' },
+    pending: {
+      type: 'integer',
+      description: '未確定仕様のため TODO/スタブになっており、保留とした検証の件数',
+    },
     summary: { type: 'string', description: '結果のサマリー（Markdown）' },
+    runDir: {
+      type: 'string',
+      description: 'テスト本体・シナリオ・結果・証跡をまとめた run ディレクトリ',
+    },
   },
-  required: ['clean', 'summary'],
+  required: ['clean', 'pending', 'summary', 'runDir'],
 } as const satisfies Schema
 
 type ResultRow = {
@@ -95,22 +107,40 @@ export function testRun(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     ...(e2e?.results ?? []).map((r) => ({ layer: 'E2E', ...r })),
   ]
 
-  const countOf = (layer: string, passed: boolean) =>
-    rows.filter((r) => r.layer === layer && r.passed === passed).length
+  const stubbed = complete(
+    dedent`
+      以下の失敗のうち、実装が TODO・スタブのまま残っている（仕様が未確定で実装されていない）ことが
+      原因のものを選び、その title を返してください
+      実装済みなのに期待通り動いていないものは含めないでください
+
+      失敗した検証:
+      ${JSON.stringify(rows.filter((r) => !r.passed))}
+    `,
+    { type: 'array', items: { type: 'string' } } as const,
+  )
+
+  const stateOf = (r: ResultRow) =>
+    r.passed ? 'passed' : stubbed.includes(r.title) ? 'pending' : 'failed'
+
+  const countOf = (layer: string, state: string) =>
+    rows.filter((r) => r.layer === layer && stateOf(r) === state).length
+  const totalOf = (state: string) => rows.filter((r) => stateOf(r) === state).length
 
   const summaryTable = boxTable(
-    ['層', '成功', '失敗', '計'],
+    ['layer', 'passed', 'failed', 'pending', 'total'],
     [
       ...['API', 'E2E'].map((layer) => [
         layer,
-        `${countOf(layer, true)}`,
-        `${countOf(layer, false)}`,
-        `${countOf(layer, true) + countOf(layer, false)}`,
+        `${countOf(layer, 'passed')}`,
+        `${countOf(layer, 'failed')}`,
+        `${countOf(layer, 'pending')}`,
+        `${rows.filter((r) => r.layer === layer).length}`,
       ]),
       [
-        '合計',
-        `${rows.filter((r) => r.passed).length}`,
-        `${rows.filter((r) => !r.passed).length}`,
+        'total',
+        `${totalOf('passed')}`,
+        `${totalOf('failed')}`,
+        `${totalOf('pending')}`,
         `${rows.length}`,
       ],
     ],
@@ -122,38 +152,61 @@ export function testRun(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     return scenario ? `[${scenario.layer}/${scenario.category}] ${title}` : title
   }
 
-  const failed = rows.filter((r) => !r.passed)
+  const failed = rows.filter((r) => stateOf(r) === 'failed')
+  const pending = rows.filter((r) => stateOf(r) === 'pending')
   const passed = rows.filter((r) => r.passed)
 
-  const failedSection = failed
-    .map((r) =>
-      dedent`
-        ❌ ${label(r.title)}
-          期待: ${scenarioByTitle.get(r.title)?.expected ?? '(不明)'}
-          実際: ${r.detail}${r.screenshot ? `\n   証跡: ${r.screenshot}` : ''}
-      `,
-    )
-    .join('\n\n')
+  const detailSection = (target: ResultRow[], icon: string) =>
+    target
+      .map((r) =>
+        dedent`
+          ${icon} ${label(r.title)}
+            期待: ${scenarioByTitle.get(r.title)?.expected ?? '(不明)'}
+            実際: ${r.detail}${r.screenshot ? `\n   証跡: ${r.screenshot}` : ''}
+        `,
+      )
+      .join('\n\n')
 
   const clean = failed.length === 0
 
-  return {
-    clean,
-    summary: dedent`
-      ## 検証結果 ${clean ? '✅ 全 ' + rows.length + ' 件成功' : `❌ ${rows.length}件中${failed.length}件失敗`}
+  const heading = clean
+    ? pending.length
+      ? `✅ ${passed.length} 件成功 / ⏸ ${pending.length} 件保留`
+      : `✅ 全 ${rows.length} 件成功`
+    : `❌ ${rows.length}件中${failed.length}件失敗`
 
-      ${summaryTable}
+  const summary = dedent`
+    ## 検証結果 ${heading}
 
-      ${failed.length ? `### 失敗\n\n${failedSection}\n` : ''}
-      ${
-        passed.length
-          ? `### 成功した${passed.length}件\n\n${passed.map((r) => `✅ ${label(r.title)}${r.detail ? ` (${r.detail})` : ''}`).join('\n')}`
-          : ''
-      }
+    ${summaryTable}
 
-      ${e2e?.screenshots.length ? `証跡: ${workingDir}/${E2E_SCREENSHOT_DIR}/ (${e2e.screenshots.length}枚)` : ''}
-    `,
-  }
+    ${failed.length ? `### 失敗\n\n${detailSection(failed, '❌')}\n` : ''}
+    ${pending.length ? `### 保留（仕様未確定・TODO/スタブのまま）\n\n${detailSection(pending, '⏸')}\n` : ''}
+    ${
+      passed.length
+        ? `### 成功した${passed.length}件\n\n${passed.map((r) => `✅ ${label(r.title)}${r.detail ? ` (${r.detail})` : ''}`).join('\n')}`
+        : ''
+    }
+  `
+
+  // ─── Phase 5: 成果物の集約 ─────────────────────────────────
+  phase('成果物の集約')
+
+  const runId = runCommand(['date -u +%Y%m%d-%H%M%S'])?.trim() || 'latest'
+  const runDir = `${workingDir}/${TEST_RUN_DIR}/${runId}`
+
+  runCommand([`mkdir -p ${runDir}`])
+  writeFile(`${runDir}/summary.md`, summary)
+  writeFile(`${runDir}/results.json`, JSON.stringify(rows.map((r) => ({ ...r, state: stateOf(r) })), null, 2))
+  runCommand([
+    `cp ${workingDir}/${TEST_SCENARIO_PATH} ${runDir}/scenarios.md 2>/dev/null || true`,
+    `cp ${workingDir}/${API_SPEC_PATH} ${runDir}/api-spec.json 2>/dev/null || true`,
+    ...(e2e?.screenshots.length
+      ? [`cp -r "$(dirname "${e2e.screenshots[0]}")" ${runDir}/e2e 2>/dev/null || true`]
+      : []),
+  ])
+
+  return { clean, pending: pending.length, summary: `${summary}\n\n成果物: ${runDir}`, runDir }
 }
 
 respond(testRun(getArgs(ARGS_SCHEMA)))

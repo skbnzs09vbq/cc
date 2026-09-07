@@ -289,8 +289,6 @@ export function testApi(args: Infer<typeof ARGS_SCHEMA>): Infer<typeof RESULT_SC
     return { title: request.title, passed: true, detail: `status=${run.status}` }
   })
 
-  runCommand([`rm -f ${specPath}`])
-
   const failed = results.filter((r) => !r.passed)
 
   return {

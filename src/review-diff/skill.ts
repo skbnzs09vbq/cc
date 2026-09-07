@@ -31,7 +31,7 @@ export const ARGS_SCHEMA = {
   required: ['workingDir'],
 } as const satisfies Schema
 
-const SOURCES = ['lint', '型チェック', 'Tailwind', 'パターン集', '実装指針', 'code-review'] as const
+const SOURCES = ['lint', 'typecheck', 'tailwind', 'patterns', 'guidelines', 'code-review'] as const
 const SEVERITIES = ['must', 'should', 'nit'] as const
 const SEVERITY_ICONS: Record<string, string> = { must: '❌', should: '⚠', nit: '💭' }
 
@@ -52,8 +52,8 @@ const ITEMS_SCHEMA = {
           must: バグ・型エラー・パターン集や指針の must 違反
           should: 直した方が明確に良いもの・指針の should 違反
           nit: 書き方の好みにとどまるもの・指針の nit 違反
-          実装指針由来の指摘は指針が置かれているレベル見出しを、
-          パターン集由来の指摘は項目見出し末尾の [must]/[should]/[nit] を、それぞれそのまま使う
+          guidelines 由来の指摘は指針が置かれているレベル見出しを、
+          patterns 由来の指摘は項目見出し末尾の [must]/[should]/[nit] を、それぞれそのまま使う
         `,
       },
       title: {
@@ -241,14 +241,14 @@ export function reviewDiff(workingDir: string): Infer<typeof CHECK_RESULT_SCHEMA
   const usedSources = SOURCES.filter((source) => items.some((i) => i.source === source))
 
   const summaryTable = boxTable(
-    ['出所', ...SEVERITIES, '計'],
+    ['source', ...SEVERITIES, 'total'],
     [
       ...usedSources.map((source) => [
         source,
         ...SEVERITIES.map((severity) => `${countOf(source, severity)}`),
         `${items.filter((i) => i.source === source).length}`,
       ]),
-      ['合計', ...SEVERITIES.map((severity) => `${totalOf(severity)}`), `${items.length}`],
+      ['total', ...SEVERITIES.map((severity) => `${totalOf(severity)}`), `${items.length}`],
     ],
     [usedSources.length],
   )
