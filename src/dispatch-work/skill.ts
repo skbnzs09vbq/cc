@@ -221,6 +221,16 @@ const REVIEW_POLICY = [
   '/progress workingDir: ., status: talking で user 待ちであることを記録してください',
 ]
 
+const RECORD_ONLY = [
+  'この時点では実装・修正・テストは行わず、状況の記録だけを行ってください',
+  ...NO_GIT_WRITE,
+]
+
+const QUEUE_NOTES = [
+  '終わったら /progress で status・questions・pending を更新すること',
+  ...NO_GIT_WRITE,
+]
+
 const POLICY = [
   '決めきれない箇所は questions に挙げて TODO/スタブで置き、それ以外は最後まで進めること',
   'テストまで通してから停止すること',
@@ -252,6 +262,10 @@ export function dispatchWork(): string {
   // ─── Phase 2: 既存 worktree の状況収集 ───────────────────────
   phase('既存worktreeの状況収集')
 
+  const reviewRequests = prsAwaitingMyReview()
+  const reviewTargets = new Set(reviewRequests.map((pr) => pr.issue))
+  const isReviewTarget = (issue: number) => reviewTargets.has(issue)
+
   const all = listWorktrees()
 
   const bootstrapped = all
@@ -265,7 +279,7 @@ export function dispatchWork(): string {
             [
               'この worktree にはまだ progress.md がありません',
               '現在のブランチと変更内容を確認し、いまの状況を now・done・next に反映してください',
-              ...POLICY,
+              ...RECORD_ONLY,
             ],
           )
         : false
@@ -304,6 +318,8 @@ export function dispatchWork(): string {
     if (progress.status === 'idle') {
       if (progress.questions.length > 0 && progress.pending > 0) continue
 
+      if (isReviewTarget(entry.number)) continue
+
       candidates.push({
         priority: PRIORITY.idleNext,
         number: entry.number,
@@ -327,15 +343,17 @@ export function dispatchWork(): string {
         planning: PRIORITY.workingStale,
       }[progress.status] ?? PRIORITY.workingStale
 
+    const review = isReviewTarget(entry.number)
+
     candidates.push({
       priority,
       number: entry.number,
-      needsServer: needsServerFor(nextCommand(entry)),
-      label: `${TICKET_PREFIX}-${entry.number}（${progress.status} が停滞）`,
+      needsServer: review ? false : needsServerFor(nextCommand(entry)),
+      label: `${TICKET_PREFIX}-${entry.number}（${review ? 'レビュー' : progress.status} が停滞）`,
       target,
       prepare: null,
-      commands: nextCommand(entry),
-      notes: POLICY,
+      commands: review ? ['レビューの続きを進めてください'] : nextCommand(entry),
+      notes: review ? REVIEW_POLICY : POLICY,
     })
   }
 
@@ -425,7 +443,7 @@ export function dispatchWork(): string {
         serverTaken = true
       }
 
-      return herdrSend(agent, [q.message], POLICY)
+      return herdrSend(agent, [q.message], QUEUE_NOTES)
     })
 
     writeQueue(queue.filter((q) => !sent.includes(q)))
@@ -441,7 +459,7 @@ export function dispatchWork(): string {
   phase('新規タスク・レビュー依頼の取り込み')
 
   if (candidates.length === 0) {
-    for (const pr of prsAwaitingMyReview()) {
+    for (const pr of reviewRequests) {
       if (entries.some((e) => e.number === pr.issue)) continue
       if (isTalking(pr.issue)) continue
 
